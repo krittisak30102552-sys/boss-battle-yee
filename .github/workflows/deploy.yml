@@ -28,9 +28,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: game/package-lock.json
 
-      - name: Extract game project
-        run: mkdir -p game && tar -xJf game-source.tar.xz -C game
+      - name: Rebuild original source archive
+        run: |
+          cat .upload-source/part-01.b64 \
+            .upload-source/part-02-slices/*.b64 \
+            .upload-source/part-03.b64 \
+            .upload-source/part-04.b64 \
+            .upload-source/part-05.b64 \
+            .upload-source/part-06.b64 \
+            .upload-source/part-07.b64 \
+            .upload-source/part-08.b64 \
+            | base64 --decode > game-source.tar.xz
+
+      - name: Verify and extract game project
+        run: |
+          xz -t game-source.tar.xz
+          mkdir -p game
+          tar -xJf game-source.tar.xz -C game
+          test -f game/package.json
+          test -f game/src/main.tsx
 
       - name: Install dependencies
         working-directory: game
