@@ -2,10 +2,14 @@
 
 A browser-based 3D boss battle built with React, TypeScript, Vite, and Three.js.
 
-## Play
-The repository includes a GitHub Actions workflow that builds the project and deploys it to GitHub Pages whenever changes are pushed to `main`. After the first successful deployment, use the Pages link shown in the Actions deployment.
+## Play online
+
+The GitHub Actions workflow builds the game and publishes it to GitHub Pages whenever a change is pushed to `main`. Once the first deployment succeeds, the game is available at:
+
+https://krittisak30102552-sys.github.io/boss-battle-yee/
 
 ## Controls
+
 - **W / A / S / D** — move
 - **Mouse** — aim / rotate camera
 - **Left click** — attack
@@ -15,16 +19,19 @@ The repository includes a GitHub Actions workflow that builds the project and de
 - **R** — repair armor
 - **P / Esc** — pause
 
-## Source
-The complete original Vite project, including its lockfile, is bundled in `game-source.tar.xz`. The deployment workflow extracts the project, installs dependencies, builds the single-file web game, and publishes the `dist` output to GitHub Pages.
-
 ## Run locally
-Extract `game-source.tar.xz`, then run:
+
+The complete original Vite source and lockfile are stored in the repository as compressed base64 segments under `.upload-source/`. The deployment workflow reconstructs the archive and extracts the project before building.
+
+After extracting the source archive, run:
+
 ```bash
 npm ci
 npm run dev
 ```
+
 To build:
+
 ```bash
 npm run build
 ```
