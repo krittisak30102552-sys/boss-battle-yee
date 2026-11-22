@@ -50,6 +50,153 @@ jobs:
           test -f game/package.json
           test -f game/src/main.tsx
 
+      - name: Apply low-glare Model 52 armor polish
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("game")
+
+          # Remove full-screen bloom and soften the scene lighting.
+          p = root / "src/game/Game.ts"
+          s = p.read_text()
+          for line in (
+              'import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";\n',
+              'import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";\n',
+              'import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";\n',
+              'import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";\n',
+          ):
+              s = s.replace(line, "")
+          s = s.replace("  private composer: EffectComposer;\n  private bloom: UnrealBloomPass;\n", "")
+          bloom = """    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 });
+              this.composer = new EffectComposer(this.renderer, rt);
+              this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+              this.composer.setSize(w, h);
+              this.composer.addPass(new RenderPass(this.scene, this.camera));
+              this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.55, 1.0);
+              this.composer.addPass(this.bloom);
+              this.composer.addPass(new OutputPass());
+          """
+          if bloom not in s:
+              raise SystemExit("Expected bloom block was not found.")
+          s = s.replace(bloom, "")
+          s = s.replace("this.renderer.toneMappingExposure = 1.05;", "this.renderer.toneMappingExposure = 0.9;")
+          s = s.replace("scene.environmentIntensity = 0.55;", "scene.environmentIntensity = 0.3;")
+          s = s.replace("    this.composer.setSize(w, h);\n    this.bloom.setSize(w, h);\n", "")
+          s = s.replace("    this.composer.dispose();\n", "")
+          s = s.replace("    this.composer.render();", "    this.renderer.render(this.scene, this.camera);")
+          p.write_text(s)
+
+          # Make the armor wider and heavier, then add layered plates and fine edge definition.
+          p = root / "src/game/builders.ts"
+          s = p.read_text()
+          s = s.replace(
+              """  const root = new THREE.Group();
+              const body = pivot(root, 0, 1.0, 0);
+
+              // pelvis + waist + torso""",
+              """  const root = new THREE.Group();
+              root.scale.set(1.14, 1.08, 1.1);
+              const body = pivot(root, 0, 1.0, 0);
+              body.scale.set(1.18, 1.05, 1.15);
+
+              // pelvis + waist + torso""",
+              1,
+          )
+          s = s.replace("{ emissive: 0x55ddff, ei: 4, metal: 0 }", "{ emissive: 0x55ddff, ei: 0.85, metal: 0 }", 1)
+          s = s.replace("{ emissive: 0x66ddff, ei: 5, metal: 0 }", "{ emissive: 0x66ddff, ei: 0.8, metal: 0 }")
+          s = s.replace("{ emissive: 0x55ddff, ei: 3, metal: 0 }", "{ emissive: 0x55ddff, ei: 0.8, metal: 0 }")
+          s = s.replace("transparent: true, opacity: 0.9 })", "transparent: true, opacity: 0.5 })", 1)
+          s = s.replace(
+              """  const aR = makeArm(-1); // character's right = screen right when seen from behind
+              const aL = makeArm(1);
+
+              // legs""",
+              """  const aR = makeArm(-1); // character's right = screen right when seen from behind
+              const aL = makeArm(1);
+              aR.sh.scale.set(1.28, 1.16, 1.2);
+              aL.sh.scale.set(1.28, 1.16, 1.2);
+              aR.el.scale.set(1.16, 1.12, 1.18);
+              aL.el.scale.set(1.16, 1.12, 1.18);
+              box(aR.sh, 0.38, 0.18, 0.36, GOLD, 0, 0.12, 0, { metal: 0.9, rough: 0.24 });
+              box(aL.sh, 0.38, 0.18, 0.36, GOLD, 0, 0.12, 0, { metal: 0.9, rough: 0.24 });
+              box(aR.el, 0.24, 0.24, 0.24, RED, 0, -0.27, 0.13, { metal: 0.82, rough: 0.28 });
+              box(aL.el, 0.24, 0.24, 0.24, RED, 0, -0.27, 0.13, { metal: 0.82, rough: 0.28 });
+
+              // legs""",
+              1,
+          )
+          s = s.replace(
+              """  const lR = makeLeg(-1);
+              const lL = makeLeg(1);
+
+              return {
+                root,""",
+              """  const lR = makeLeg(-1);
+              const lL = makeLeg(1);
+              lR.hip.scale.set(1.2, 1.08, 1.18);
+              lL.hip.scale.set(1.2, 1.08, 1.18);
+              lR.knee.scale.set(1.16, 1.08, 1.18);
+              lL.knee.scale.set(1.16, 1.08, 1.18);
+              box(lR.knee, 0.3, 0.16, 0.34, GOLD, 0, -0.12, 0.14, { metal: 0.9, rough: 0.24 });
+              box(lL.knee, 0.3, 0.16, 0.34, GOLD, 0, -0.12, 0.14, { metal: 0.9, rough: 0.24 });
+
+              const outlineMat = new THREE.LineBasicMaterial({ color: 0x30232a, transparent: true, opacity: 0.62 });
+              const armorMeshes: THREE.Mesh[] = [];
+              root.traverse((obj) => {
+                const mesh = obj as THREE.Mesh;
+                if (mesh.isMesh && mesh.material instanceof THREE.MeshStandardMaterial && mesh.material.emissiveIntensity < 1.2) {
+                  armorMeshes.push(mesh);
+                }
+              });
+              for (const mesh of armorMeshes) {
+                const geo = mesh.geometry as THREE.BufferGeometry;
+                geo.computeBoundingBox();
+                const pos = geo.attributes.position;
+                const mat = mesh.material as THREE.MeshStandardMaterial;
+                const base = mat.color.clone();
+                const hi = base.clone().lerp(new THREE.Color(0xffffff), 0.2);
+                const lo = base.clone().multiplyScalar(0.62);
+                const colors: number[] = [];
+                const minY = geo.boundingBox!.min.y;
+                const height = Math.max(0.001, geo.boundingBox!.max.y - minY);
+                for (let i = 0; i < pos.count; i++) {
+                  const t = THREE.MathUtils.clamp((pos.getY(i) - minY) / height, 0, 1);
+                  const c = lo.clone().lerp(hi, t);
+                  colors.push(c.r, c.g, c.b);
+                }
+                geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+                mat.vertexColors = true;
+                mat.color.set(0xffffff);
+                mat.needsUpdate = true;
+                const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 24), outlineMat);
+                edge.position.copy(mesh.position);
+                edge.rotation.copy(mesh.rotation);
+                edge.scale.copy(mesh.scale);
+                edge.renderOrder = 2;
+                mesh.parent?.add(edge);
+              }
+
+              return {
+                root,""",
+              1,
+          )
+          p.write_text(s)
+
+          # Update the on-screen armor label and soften decorative title glow.
+          p = root / "src/App.tsx"
+          s = p.read_text()
+          s = s.replace("MARK 51 · เกราะ", "MODEL 52 · HULKBUSTER")
+          s = s.replace(" MK-51", " MODEL 52")
+          s = s.replace(
+              "สนามรบบนไททัน — ธานอสถือเกาน์ทเล็ตอินฟินิตี้อยู่ตรงหน้า ใช้เกราะนาโนบอทของ Mark 51 ที่เปลี่ยนเป็นอาวุธได้ทุกแบบ",
+              "สนามรบบนไททัน — สวมเกราะ Hulkbuster Model 52 ที่มีแผ่นเกราะซ้อนหนา ขอบโลหะ และรายละเอียดเกราะแบบคอมิก",
+          )
+          s = s.replace("drop-shadow-[0_0_20px_rgba(239,68,68,0.6)]", "drop-shadow-[0_0_5px_rgba(239,68,68,0.2)]")
+          s = s.replace("drop-shadow-[0_0_24px_rgba(168,85,247,0.7)]", "drop-shadow-[0_0_6px_rgba(168,85,247,0.22)]")
+          p.write_text(s)
+          PY
+
       - name: Install dependencies
         working-directory: game
         run: npm ci
