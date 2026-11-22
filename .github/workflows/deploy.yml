@@ -30,7 +30,7 @@ jobs:
           node-version: 22
 
       - name: Extract game project
-        run: mkdir -p game && tar -xzf game-source.tar.gz -C game
+        run: mkdir -p game && tar -xJf game-source.tar.xz -C game
 
       - name: Install dependencies
         working-directory: game
