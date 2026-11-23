@@ -346,7 +346,7 @@ jobs:
               r.root.position.copy(p.pos);"""
           if pose_branch in s:
               s = s.replace(pose_branch, pose_branch_new)
-          s = s.replace("    this.updatePlayerPose(dt);\n", "    this.updatePlayerPose(dt);\n    this.updateSuitCompanion(dt);\n")
+          s = s.replace("    this.updatePlayerPose(dt);\n", "    this.updatePlayerPose(dt);\n    this.updateSuitAssembly(dt);\n    this.updateSuitCompanion(dt);\n")
           p.write_text(s)
 
           # Correct all UI copy to the sleek Iron Man Mark 85 from Endgame.
