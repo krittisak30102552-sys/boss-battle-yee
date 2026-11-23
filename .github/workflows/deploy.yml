@@ -50,6 +50,15 @@ jobs:
           test -f game/package.json
           test -f game/src/main.tsx
 
+      - name: Inspect game UI and input hooks
+        run: |
+          echo '--- APP TSX ---'
+          sed -n '1,280p' game/src/App.tsx
+          echo '--- GAME INPUT REFERENCES ---'
+          grep -nEi 'keydown|keyup|pointer|mousemove|touch|wasd|arrow|space|controls|start|onClick' game/src/game/Game.ts | head -180
+          echo '--- INDEX ---'
+          sed -n '1,200p' game/index.html
+
       - name: Apply low-glare Mark 85 armor polish
         run: |
           python3 - <<'PY'
