@@ -50,6 +50,17 @@ jobs:
           test -f game/package.json
           test -f game/src/main.tsx
 
+      - name: Inspect original menu and start handler
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("game/src/App.tsx")
+          lines = p.read_text().splitlines()
+          for i, line in enumerate(lines):
+              if any(k in line.lower() for k in ("start", "เริ่มเกม", "เริ่มการต่อสู้", "menu")):
+                  print(f"{i+1}: {line[:260]}")
+          PY
+
       - name: Apply low-glare Mark 85 armor polish
         run: |
           python3 - <<'PY'
