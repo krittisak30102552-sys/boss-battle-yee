@@ -179,7 +179,7 @@ jobs:
 
           touchLook(dx: number, dy: number) {
             this.camYaw -= dx * 0.006;
-            this.camPitch = clamp(this.camPitch - dy * 0.006, -0.55, 1.15);
+            this.camPitch = clamp(this.camPitch + dy * 0.006, -0.55, 1.15);
           }
 
           """
