@@ -269,6 +269,26 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Verify device chooser patch
+        working-directory: game
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("src/App.tsx").read_text()
+          checks = {
+              "chooser state": 'const [chooseMode, setChooseMode] = useState(false);' in s,
+              "device mode state": 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' in s,
+              "start opens chooser": 'onClick={() => setChooseMode(true)}' in s,
+              "chooser UI exists": "SELECT CONTROL MODE" in s,
+              "chooser is top-layer": 'fixed inset-0 z-[99999]' in s,
+              "obsolete download buttons removed": "<DownloadButtons />" not in s,
+          }
+          for name, ok in checks.items():
+              print(("PASS" if ok else "FAIL") + ": " + name)
+          if not all(checks.values()):
+              raise SystemExit("Device chooser patch is incomplete")
+          PY
+
       - name: Install dependencies
         working-directory: game
         run: npm ci
