@@ -109,7 +109,7 @@ jobs:
           state_idx = s.find(state_anchor)
           if state_idx >= 0 and 'const [chooseMode, setChooseMode]' not in s:
               state_end = state_idx + len(state_anchor)
-              s = s[:state_end] + '\\n  const [chooseMode, setChooseMode] = useState(false);\\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' + s[state_end:]
+              s = s[:state_end] + '\n  const [chooseMode, setChooseMode] = useState(false);\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' + s[state_end:]
           start_anchor = 'onClick={() => gameRef.current?.start()}'
           start_idx = s.find(start_anchor)
           if start_idx >= 0:
