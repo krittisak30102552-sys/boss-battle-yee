@@ -635,12 +635,122 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Overlay refined character animations and Tony Stark model
+      - name: Add refined Tony Stark and cinematic suit animation
         run: |
-          base64 --decode .upload-source/refine-character-animations.tar.gz.b64 | tar -xz -C game
-          test -f game/src/game/suit.ts
-          grep -q 'import { SuitSystem } from "./suit";' game/src/game/Game.ts
-          grep -q 'function buildTony(): TonyRig' game/src/game/suit.ts
+          mkdir -p /tmp/refined
+          base64 --decode .upload-source/refine-character-animations.tar.gz.b64 | tar -xz -C /tmp/refined
+          cp /tmp/refined/src/game/suit.ts game/src/game/suit.ts
+          cp /tmp/refined/src/game/audio.ts game/src/game/audio.ts
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("game/src/game/Game.ts")
+          s = p.read_text()
+
+          # Attach the new articulated Tony rig and piece-by-piece nanotech suit animation.
+          if 'import { SuitSystem } from "./suit";' not in s:
+              anchor = 'import { NanoSystem } from "./nano";'
+              if anchor not in s:
+                  raise SystemExit("NanoSystem import anchor missing")
+              s = s.replace(anchor, anchor + '\nimport { SuitSystem } from "./suit";')
+
+          if "private suit: SuitSystem;" not in s:
+              anchor = "  private nano: NanoSystem;"
+              if anchor not in s:
+                  raise SystemExit("NanoSystem field anchor missing")
+              s = s.replace(anchor, anchor + "\n  private suit: SuitSystem;")
+
+          init = """
+              this.suit = new SuitSystem({
+                rig: this.rig,
+                scene: this.scene,
+                spark: (pos, color, count, speed) => {
+                  for (let i = 0; i < count; i++) {
+                    this.fx.spawn(pos.x, pos.y, pos.z, rnd(-speed, speed), rnd(-speed * 0.3, speed * 1.2), rnd(-speed, speed), rnd(0.3, 0.7), rnd(0.05, 0.12), color, -2);
+                  }
+                },
+                player: () => this.pl,
+                bossPos: () => this.boss.pos,
+                setWeaponHidden: (hide) => this.setWeaponHidden(hide),
+                onDonned: () => {
+                  this.armPose = { shR: 0, elR: 0, shL: 0, elL: 0 };
+                  this.suitAiTimer = 0;
+                },
+              });
+          """
+          if "this.suit = new SuitSystem(" not in s:
+              anchor = "    this.fx = new FX(this.scene);"
+              if anchor not in s:
+                  raise SystemExit("FX constructor anchor missing")
+              s = s.replace(anchor, anchor + "\n" + init)
+
+          hidden = """
+          private setWeaponHidden(hide: boolean) {
+            const g = this.nano.weapon.group;
+            if (hide) g.visible = false;
+            else if (this.nano.ready) g.visible = true;
+          }
+
+          """
+          if "private setWeaponHidden(hide: boolean)" not in s:
+              anchor = "  private updateSuitAssembly(dt: number) {"
+              if anchor not in s:
+                  raise SystemExit("suit animation method anchor missing")
+              s = s.replace(anchor, hidden + anchor)
+
+          pattern = r"  toggleSuit\(\) \{.*?\n  \}\n\n  selectSkill"
+          replacement = """  toggleSuit() {
+            const active = this.suit.toggle();
+            this.tonyMode = active;
+            this.tonyRoot.visible = false;
+            return active;
+          }
+
+          selectSkill"""
+          s, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit("Could not replace old suit toggle")
+
+          old_pose = """    if (this.tonyMode) {
+                this.tonyRoot.position.copy(p.pos);
+                this.tonyRoot.position.y += Math.sin(this.time * 5) * 0.025;
+                this.tonyRoot.rotation.y = p.heading;
+                return;
+              }"""
+          new_pose = """    if (this.suit.active) {
+                this.suit.poseTony(dt, this.time, { pos: p.pos, heading: p.heading, speed, walk: p.walk, grounded, camPitch: this.camPitch });
+                return;
+              }"""
+          if old_pose in s:
+              s = s.replace(old_pose, new_pose)
+          elif "this.suit.poseTony(dt, this.time" not in s:
+              raise SystemExit("Tony pose branch anchor missing")
+
+          s = s.replace(
+              "    this.updatePlayerPose(dt);\n    this.updateSuitAssembly(dt);\n    this.updateSuitCompanion(dt);",
+              "    this.updatePlayerPose(dt);\n    this.suit.update(dt, this.time);"
+          )
+          if "this.suit.update(dt, this.time);" not in s:
+              raise SystemExit("Main loop suit update anchor missing")
+
+          if "this.suit.reset();" not in s:
+              anchor = "    this.tonyMode = false;"
+              if anchor not in s:
+                  raise SystemExit("Reset Tony state anchor missing")
+              s = s.replace(anchor, anchor + "\n    this.suit.reset();", 1)
+
+          s = s.replace("tony: this.tonyMode,", "tony: this.suit.active,")
+          s = s.replace("suitBusy: this.suitAnimMode !== \"none\",", "suitBusy: this.suit.mode !== \"none\",")
+
+          # Keep the existing player combat/input code untouched; T only switches the suit state.
+          if 'if (e.code === "KeyT") this.toggleSuit();' not in s:
+              anchor = '      if (e.code === "KeyR") this.heal();'
+              if anchor in s:
+                  s = s.replace(anchor, anchor + '\n      if (e.code === "KeyT") this.toggleSuit();')
+
+          p.write_text(s)
+          PY
 
       - name: Verify device chooser patch
         working-directory: game
@@ -655,7 +765,6 @@ jobs:
               "suit system integrated": 'import { SuitSystem } from "./suit";' in g and "new SuitSystem(" in g,
               "suit animation updates each frame": "this.suit.update(dt, this.time);" in g,
               "Tony animation updates while unarmored": "this.suit.poseTony(dt, this.time" in g,
-              "autonomous armor companion": "private updateSuitCompanion(dt: number)" in g and "this.updateSuitCompanion(dt);" in g,
               "suit toggle API": "toggleSuit()" in g,
               "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
               "camera drag covers blank screen": 'absolute inset-0 z-10 touch-none' in s,
