@@ -94,7 +94,9 @@ jobs:
           private nano: NanoSystem;
           private tonyMode = false;
           private tonyRoot = new THREE.Group();
-          private suitAiTimer = 0;"""
+          private suitAiTimer = 0;
+          private suitAnimMode: "none" | "remove-open" | "remove-fly" | "put-fly" | "put-assemble" = "none";
+          private suitAnimTimer = 0;"""
           if field_anchor in s and "private tonyMode = false;" not in s:
               s = s.replace(field_anchor, fields)
 
@@ -145,14 +147,25 @@ jobs:
 
           public_methods = """
           toggleSuit() {
-            this.tonyMode = !this.tonyMode;
-            this.tonyRoot.visible = this.tonyMode;
+            if (this.suitAnimMode !== "none") return this.tonyMode;
+            this.suitAnimTimer = 0;
             this.rig.root.visible = true;
             if (!this.tonyMode) {
+              this.tonyMode = true;
+              this.tonyRoot.visible = true;
+              this.suitAnimMode = "remove-open";
               this.rig.root.position.copy(this.pl.pos);
               this.rig.root.rotation.set(0, this.pl.heading, 0);
+              for (const part of this.rig.root.children) {
+                const data = part.userData as any;
+                data.__suitBasePos = part.position.clone();
+                data.__suitBaseRot = part.rotation.clone();
+                data.__suitBaseScale = part.scale.clone();
+              }
+            } else {
+              this.suitAnimMode = "put-fly";
+              this.suitAiTimer = 999;
             }
-            this.suitAiTimer = 0.4;
             return this.tonyMode;
           }
 
@@ -184,8 +197,101 @@ jobs:
 
           pose_anchor = "  private updatePlayerPose(dt: number) {"
           ai_methods = """
+          private updateSuitAssembly(dt: number) {
+            if (this.suitAnimMode === "none") return;
+            this.suitAnimTimer += dt;
+            const root = this.rig.root;
+            const parts = root.children;
+            if (this.suitAnimMode === "remove-open") {
+              const t = Math.min(1, this.suitAnimTimer / 0.72);
+              parts.forEach((part, i) => {
+                const data = part.userData as any;
+                const base = data.__suitBasePos as THREE.Vector3;
+                const angle = (i / Math.max(1, parts.length)) * Math.PI * 2;
+                const spread = 0.9 * Math.sin(t * Math.PI * 0.5);
+                part.position.set(base.x + Math.cos(angle) * spread, base.y + Math.sin(angle * 1.7) * spread, base.z + Math.sin(angle) * spread);
+                part.rotation.x = data.__suitBaseRot.x + Math.sin(angle) * t * 0.45;
+                part.rotation.y = data.__suitBaseRot.y + t * 0.5;
+              });
+              if (t >= 1) {
+                parts.forEach((part) => {
+                  const data = part.userData as any;
+                  part.position.copy(data.__suitBasePos);
+                  part.rotation.copy(data.__suitBaseRot);
+                });
+                this.suitAnimMode = "remove-fly";
+                this.suitAnimTimer = 0;
+              }
+              return;
+            }
+            if (this.suitAnimMode === "remove-fly") {
+              const b = this.boss;
+              const a = Math.min(1, this.suitAnimTimer / 1.0);
+              const orbit = this.time * 0.72;
+              const destination = this.v1.set(b.pos.x + Math.cos(orbit) * 7.5, 3.4, b.pos.z + Math.sin(orbit) * 7.5);
+              root.position.lerp(destination, Math.min(1, dt * 2.8));
+              root.rotation.y = Math.atan2(b.pos.x - root.position.x, b.pos.z - root.position.z);
+              if (a >= 1) {
+                this.suitAnimMode = "none";
+                this.suitAiTimer = 0.35;
+              }
+              return;
+            }
+            if (this.suitAnimMode === "put-fly") {
+              const t = Math.min(1, this.suitAnimTimer / 0.72);
+              const destination = this.pl.pos.clone();
+              destination.y = 0;
+              root.position.lerp(destination, Math.min(1, dt * 4.5));
+              root.rotation.y = this.pl.heading;
+              if (t >= 1) {
+                parts.forEach((part) => {
+                  const data = part.userData as any;
+                  data.__suitBasePos ??= part.position.clone();
+                  data.__suitBaseRot ??= part.rotation.clone();
+                  data.__suitBaseScale ??= part.scale.clone();
+                  part.visible = true;
+                  part.scale.setScalar(0.001);
+                });
+                this.suitAnimMode = "put-assemble";
+                this.suitAnimTimer = 0;
+              }
+              return;
+            }
+            if (this.suitAnimMode === "put-assemble") {
+              const pieceDelay = 0.13;
+              const duration = 0.42;
+              parts.forEach((part, i) => {
+                const data = part.userData as any;
+                const local = this.suitAnimTimer - i * pieceDelay;
+                const t = Math.max(0, Math.min(1, local / duration));
+                part.visible = local >= 0;
+                const baseScale = data.__suitBaseScale as THREE.Vector3;
+                if (part.visible) part.scale.copy(baseScale).multiplyScalar(0.001 + 0.999 * (t * (2 - t)));
+                if (t >= 1) {
+                  part.position.copy(data.__suitBasePos);
+                  part.rotation.copy(data.__suitBaseRot);
+                }
+              });
+              if (this.suitAnimTimer >= (Math.max(0, parts.length - 1) * pieceDelay + duration)) {
+                parts.forEach((part) => {
+                  const data = part.userData as any;
+                  part.visible = true;
+                  part.position.copy(data.__suitBasePos);
+                  part.rotation.copy(data.__suitBaseRot);
+                  part.scale.copy(data.__suitBaseScale);
+                });
+                root.position.copy(this.pl.pos);
+                root.rotation.set(0, this.pl.heading, 0);
+                this.tonyMode = false;
+                this.tonyRoot.visible = false;
+                this.suitAnimMode = "none";
+                this.suitAiTimer = 0;
+              }
+            }
+          }
+
           private updateSuitCompanion(dt: number) {
-            if (!this.tonyMode || this.boss.state === "dead") return;
+            if (!this.tonyMode || this.suitAnimMode !== "none" || this.boss.state === "dead") return;
             const b = this.boss;
             const r = this.rig.root;
             const orbit = this.time * 0.72;
@@ -326,10 +432,10 @@ jobs:
           helper = '''
           const holdKey = (code: string, label: string, extra = "") => (
             <button key={code} type="button"
-              onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); window.dispatchEvent(new KeyboardEvent("keydown", { code, bubbles: true })); }}
-              onPointerUp={() => window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }))}
-              onPointerCancel={() => window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }))}
-              onLostPointerCapture={() => window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }))}
+              onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); document.dispatchEvent(new KeyboardEvent("keydown", { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code.startsWith("Arrow") ? code.slice(5).toLowerCase() : code === "ShiftLeft" ? "Shift" : code, bubbles: true })); }}
+              onPointerUp={() => document.dispatchEvent(new KeyboardEvent("keyup", { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code.startsWith("Arrow") ? code.slice(5).toLowerCase() : code === "ShiftLeft" ? "Shift" : code, bubbles: true }))}
+              onPointerCancel={() => document.dispatchEvent(new KeyboardEvent("keyup", { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code.startsWith("Arrow") ? code.slice(5).toLowerCase() : code === "ShiftLeft" ? "Shift" : code, bubbles: true }))}
+              onLostPointerCapture={() => document.dispatchEvent(new KeyboardEvent("keyup", { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code.startsWith("Arrow") ? code.slice(5).toLowerCase() : code === "ShiftLeft" ? "Shift" : code, bubbles: true }))}
               onContextMenu={(e) => e.preventDefault()}
               className={`h-12 w-12 rounded-xl border border-white/35 bg-black/65 text-lg font-black text-white shadow-lg active:bg-cyan-500/50 active:scale-95 ${extra}`}>
               {label}
@@ -352,15 +458,16 @@ jobs:
           helper_anchor = '  const bossPct = hud.bossHp / hud.bossMax;'
           helpers = """
           const cameraTouchRef = useRef<{ x: number; y: number } | null>(null);
+          const stickPointerRef = useRef<number | null>(null);
           const virtualKeysRef = useRef<Set<string>>(new Set());
           const setVirtualKey = (code: string, down: boolean) => {
             const held = virtualKeysRef.current.has(code);
             if (down && !held) {
               virtualKeysRef.current.add(code);
-              window.dispatchEvent(new KeyboardEvent("keydown", { code, bubbles: true }));
+              document.dispatchEvent(new KeyboardEvent("keydown", { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code.startsWith("Arrow") ? code.slice(5).toLowerCase() : code === "ShiftLeft" ? "Shift" : code, bubbles: true }));
             } else if (!down && held) {
               virtualKeysRef.current.delete(code);
-              window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }));
+              document.dispatchEvent(new KeyboardEvent("keyup", { code, key: code.startsWith("Key") ? code.slice(3).toLowerCase() : code === "Space" ? " " : code.startsWith("Arrow") ? code.slice(5).toLowerCase() : code === "ShiftLeft" ? "Shift" : code, bubbles: true }));
             }
           };
           const moveStick = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -392,9 +499,9 @@ jobs:
                 {showHud && deviceMode === "mobile" && hud.status === "playing" && (
                   <>
                     <div className="pointer-events-auto absolute bottom-7 left-5 z-30 flex h-36 w-36 touch-none items-center justify-center rounded-full border-2 border-white/40 bg-black/40 shadow-xl"
-                      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); moveStick(e); }}
-                      onPointerMove={(e) => { if (e.buttons || e.pressure > 0) moveStick(e); }}
-                      onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
+                      onPointerDown={(e) => { e.preventDefault(); stickPointerRef.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); moveStick(e); }}
+                      onPointerMove={(e) => { if (stickPointerRef.current === e.pointerId) moveStick(e); }}
+                      onPointerUp={() => { stickPointerRef.current = null; releaseStick(); }} onPointerCancel={() => { stickPointerRef.current = null; releaseStick(); }} onLostPointerCapture={() => { stickPointerRef.current = null; releaseStick(); }}>
                       <div className="pointer-events-none absolute h-24 w-24 rounded-full border border-white/25" />
                       <div data-stick-knob className="pointer-events-none absolute h-14 w-14 rounded-full border-2 border-cyan-200 bg-cyan-400/50 shadow-lg" />
                     </div>
@@ -451,7 +558,7 @@ jobs:
                           onPointerCancel={() => gameRef.current?.setAttackHeld(false)}
                           onLostPointerCapture={() => gameRef.current?.setAttackHeld(false)}
                           className="rounded-xl border border-amber-300/70 bg-red-700/85 px-4 py-3 text-sm font-black text-white active:scale-95">โจมตี</button>
-                        <button type="button" onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR", bubbles: true }))}
+                        <button type="button" onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR", key: "r", bubbles: true }))}
                           className="rounded-xl border border-emerald-300/60 bg-emerald-900/80 px-3 py-3 text-xs font-black text-white active:scale-95">ซ่อมเกราะ</button>
                         {holdKey("ShiftLeft", "พุ่ง", "w-full h-11 text-xs")}
                         {holdKey("Space", "บิน", "w-full h-11 text-xs")}
@@ -491,6 +598,10 @@ jobs:
               "autonomous suit AI": "private updateSuitCompanion(dt: number)" in g,
               "autonomous suit AI runs each frame": "this.updateSuitCompanion(dt);" in g,
               "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
+              "mobile key events bubble from document": "document.dispatchEvent(new KeyboardEvent" in s,
+              "mobile keys include key and code": 'key: code.startsWith("Key")' in s,
+              "suit removal opens pieces before flight": '"remove-open"' in g and '"remove-fly"' in g,
+              "suit returns piece by piece": '"put-assemble"' in g and "pieceDelay = 0.13" in g,
               "chooser state": "const [chooseMode, setChooseMode] = useState(false);" in s,
               "device mode state": 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' in s,
               "start opens chooser": "onClick={() => setChooseMode(true)}" in s,
