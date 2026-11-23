@@ -50,19 +50,6 @@ jobs:
           test -f game/package.json
           test -f game/src/main.tsx
 
-      - name: Inspect original menu and start handler
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("game/src/App.tsx")
-          lines = p.read_text().splitlines()
-          for a, b in ((235, 315),):
-              for i in range(a, min(b, len(lines))):
-                  print(f"{i+1}: {lines[i]}")
-          print("PAUSE_ANCHOR", '      {/* ---------------- PAUSE ---------------- */}' in p.read_text())
-          print("MENU_ANCHOR", '      {/* ---------------- MENU ---------------- */}' in p.read_text())
-          PY
-
       - name: Apply low-glare Mark 85 armor polish
         run: |
           python3 - <<'PY'
@@ -127,7 +114,7 @@ jobs:
           )
           chooser = """
                 {chooseMode && hud.status === "menu" && (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/90 p-5">
+                  <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 p-5">
                     <div className="w-full max-w-xl border border-amber-300/50 bg-slate-950/95 p-6 text-center shadow-2xl">
                       <div className="text-amber-300 text-xs font-black tracking-[0.35em]">SELECT CONTROL MODE</div>
                       <h2 className="mt-3 text-2xl sm:text-3xl font-black">เล่นบนอุปกรณ์ไหน?</h2>
