@@ -484,7 +484,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s = Path("src/App.tsx").read_text()
+          g = Path("src/game/Game.ts").read_text()
           checks = {
+              "Tony 3D character model": "private buildTonyModel()" in g,
+              "suit toggle API": "toggleSuit()" in g,
+              "autonomous suit AI": "private updateSuitCompanion(dt: number)" in g,
+              "autonomous suit AI runs each frame": "this.updateSuitCompanion(dt);" in g,
+              "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
               "chooser state": "const [chooseMode, setChooseMode] = useState(false);" in s,
               "device mode state": 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' in s,
               "start opens chooser": "onClick={() => setChooseMode(true)}" in s,
