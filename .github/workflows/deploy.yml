@@ -105,17 +105,16 @@ jobs:
           # Add a device chooser and touch movement/camera controls to the React UI.
           p = root / "src/App.tsx"
           s = p.read_text()
-          import re
-          s, state_count = re.subn(
-              r'(?m)^(\\s*)const \\[error, setError\\] = useState\\(\\"\\"\\);$',
-              lambda m: m.group(0) + '\\n' + m.group(1) + 'const [chooseMode, setChooseMode] = useState(false);\\n' + m.group(1) + 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);',
-              s, count=1
-          )
-          s, start_count = re.subn(
-              r'onClick=\\{\\(\\) => gameRef\\.current\\?\\.start\\(\\)\\}',
-              'onClick={() => setChooseMode(true)}', s, count=1
-          )
-          print("chooser state/start matches:", state_count, start_count)
+          state_anchor = 'const [error, setError] = useState("");'
+          state_idx = s.find(state_anchor)
+          if state_idx >= 0 and 'const [chooseMode, setChooseMode]' not in s:
+              state_end = state_idx + len(state_anchor)
+              s = s[:state_end] + '\\n  const [chooseMode, setChooseMode] = useState(false);\\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' + s[state_end:]
+          start_anchor = 'onClick={() => gameRef.current?.start()}'
+          start_idx = s.find(start_anchor)
+          if start_idx >= 0:
+              s = s[:start_idx] + 'onClick={() => setChooseMode(true)}' + s[start_idx + len(start_anchor):]
+          print("State anchor/start anchor:", state_idx, start_idx)
           chooser = """
                 {chooseMode && (
                   <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/95 p-5">
