@@ -50,15 +50,6 @@ jobs:
           test -f game/package.json
           test -f game/src/main.tsx
 
-      - name: Inspect game UI and input hooks
-        run: |
-          echo '--- APP TSX ---'
-          sed -n '1,280p' game/src/App.tsx
-          echo '--- GAME INPUT REFERENCES ---'
-          grep -nEi 'keydown|keyup|pointer|mousemove|touch|wasd|arrow|space|controls|start|onClick' game/src/game/Game.ts | head -180
-          echo '--- INDEX ---'
-          sed -n '1,200p' game/index.html
-
       - name: Apply low-glare Mark 85 armor polish
         run: |
           python3 - <<'PY'
@@ -108,6 +99,98 @@ jobs:
           )
           s = s.replace("drop-shadow-[0_0_20px_rgba(239,68,68,0.6)]", "drop-shadow-[0_0_5px_rgba(239,68,68,0.2)]")
           s = s.replace("drop-shadow-[0_0_24px_rgba(168,85,247,0.7)]", "drop-shadow-[0_0_6px_rgba(168,85,247,0.22)]")
+          p.write_text(s)
+
+          # Add a device chooser and touch movement/camera controls to the React UI.
+          p = root / "src/App.tsx"
+          s = p.read_text()
+          s = s.replace(
+              '  const [error, setError] = useState("");',
+              '  const [error, setError] = useState("");\\n  const [chooseMode, setChooseMode] = useState(false);\\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);'
+          )
+          s = s.replace(
+              'onClick={() => gameRef.current?.start()}',
+              'onClick={() => setChooseMode(true)}'
+          )
+          chooser = """
+                {chooseMode && hud.status === "menu" && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/90 p-5">
+                    <div className="w-full max-w-xl border border-amber-300/50 bg-slate-950/95 p-6 text-center shadow-2xl">
+                      <div className="text-amber-300 text-xs font-black tracking-[0.35em]">SELECT CONTROL MODE</div>
+                      <h2 className="mt-3 text-2xl sm:text-3xl font-black">เล่นบนอุปกรณ์ไหน?</h2>
+                      <p className="mt-2 text-sm text-white/60">เลือกวิธีควบคุมก่อนเข้าสู่สนาม</p>
+                      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button onClick={() => { setDeviceMode("desktop"); setChooseMode(false); gameRef.current?.start(); }}
+                          className="border border-cyan-300/60 bg-cyan-500/10 p-5 text-left hover:bg-cyan-500/20 active:scale-95">
+                          <div className="text-4xl">🖥️</div><div className="mt-2 text-lg font-black">คอมพิวเตอร์</div>
+                          <div className="text-xs text-white/60">คีย์บอร์ด + เมาส์</div>
+                        </button>
+                        <button onClick={() => { setDeviceMode("mobile"); setChooseMode(false); gameRef.current?.start(); }}
+                          className="border border-amber-300/60 bg-amber-500/10 p-5 text-left hover:bg-amber-500/20 active:scale-95">
+                          <div className="text-4xl">📱</div><div className="mt-2 text-lg font-black">โทรศัพท์</div>
+                          <div className="text-xs text-white/60">ปุ่มสัมผัสบนหน้าจอ</div>
+                        </button>
+                      </div>
+                      <button onClick={() => setChooseMode(false)} className="mt-5 px-5 py-2 text-sm text-white/60 hover:text-white">← กลับ</button>
+                    </div>
+                  </div>
+                )}
+          """
+          anchor = '      {/* ---------------- PAUSE ---------------- */}'
+          if anchor in s and 'SELECT CONTROL MODE' not in s:
+              s = s.replace(anchor, chooser + '\\n      ' + anchor)
+
+          mobile = """
+                {showHud && deviceMode === "mobile" && hud.status === "playing" && (
+                  <div className="pointer-events-none absolute inset-0 z-20 touch-none">
+                    <div className="pointer-events-auto absolute bottom-24 left-3 grid grid-cols-3 gap-1.5">
+                      <span />
+                      {holdKey("KeyW", "▲", "col-start-2")}
+                      <span />
+                      {holdKey("KeyA", "◀", "")}
+                      {holdKey("KeyS", "▼", "")}
+                      {holdKey("KeyD", "▶", "")}
+                    </div>
+                    <div className="pointer-events-auto absolute bottom-24 right-3 flex flex-col items-center gap-2">
+                      {holdKey("Space", "กระโดด / บิน", "w-28 h-14 text-xs")}
+                      {holdKey("ShiftLeft", "พุ่งหลบ", "w-28 h-11 text-xs")}
+                      <div className="grid grid-cols-3 gap-1">
+                        <span />
+                        {holdKey("ArrowUp", "กล้อง ▲", "w-12 h-10 text-[10px]")}
+                        <span />
+                        {holdKey("ArrowLeft", "◀", "w-12 h-10")}
+                        {holdKey("ArrowDown", "▼", "w-12 h-10")}
+                        {holdKey("ArrowRight", "▶", "w-12 h-10")}
+                      </div>
+                    </div>
+                  </div>
+                )}
+          """
+          # Add a small helper that emits the same keyboard events the game already listens for.
+          helper_anchor = '  const bossPct = hud.bossHp / hud.bossMax;'
+          helper = '''
+          const holdKey = (code: string, label: string, extra = "") => (
+            <button key={code} type="button"
+              onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); window.dispatchEvent(new KeyboardEvent("keydown", { code, bubbles: true })); }}
+              onPointerUp={() => window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }))}
+              onPointerCancel={() => window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }))}
+              onLostPointerCapture={() => window.dispatchEvent(new KeyboardEvent("keyup", { code, bubbles: true }))}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`h-12 w-12 rounded-xl border border-white/35 bg-black/65 text-lg font-black text-white shadow-lg active:bg-cyan-500/50 active:scale-95 ${extra}`}>
+              {label}
+            </button>
+          );
+          '''
+          if helper_anchor in s and 'const holdKey = ' not in s:
+              s = s.replace(helper_anchor, helper + '\\n  ' + helper_anchor)
+          # Insert touch overlay inside the main app, immediately before the menu.
+          menu_anchor = '      {/* ---------------- MENU ---------------- */}'
+          if menu_anchor in s and 'deviceMode === "mobile"' not in s:
+              s = s.replace(menu_anchor, mobile + '\\n      ' + menu_anchor)
+
+          # Correct remaining armor labels while preserving the original game model.
+          s = s.replace("MARK 51 · เกราะ", "MARK 85 · NANOTECH")
+          s = s.replace("MK-51", "MK-85")
           p.write_text(s)
           PY
 
