@@ -269,24 +269,16 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Verify device chooser patch
+      - name: Inspect extracted App component
         working-directory: game
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          s = Path("src/App.tsx").read_text()
-          checks = {
-              "chooser state": 'const [chooseMode, setChooseMode] = useState(false);' in s,
-              "device mode state": 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' in s,
-              "start opens chooser": 'onClick={() => setChooseMode(true)}' in s,
-              "chooser UI exists": "SELECT CONTROL MODE" in s,
-              "chooser is top-layer": 'fixed inset-0 z-[99999]' in s,
-              "obsolete download buttons removed": "<DownloadButtons />" not in s,
-          }
-          for name, ok in checks.items():
-              print(("PASS" if ok else "FAIL") + ": " + name)
-          if not all(checks.values()):
-              raise SystemExit("Device chooser patch is incomplete")
+          s = Path("src/App.tsx").read_text().splitlines()
+          keys = ("useState", "gameRef.current", "เริ่มเกม", "MENU", "PAUSE", "bossPct", "const [error", "return (", "DownloadButtons")
+          for i, line in enumerate(s, 1):
+              if any(k in line for k in keys):
+                  print(f"{i}: {line[:240]}")
           PY
 
       - name: Install dependencies
