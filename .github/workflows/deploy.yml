@@ -114,8 +114,8 @@ jobs:
               'onClick={() => setChooseMode(true)}'
           )
           chooser = """
-                {chooseMode && hud.status === "menu" && (
-                  <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 p-5">
+                {chooseMode && (
+                  <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/95 p-5">
                     <div className="w-full max-w-xl border border-amber-300/50 bg-slate-950/95 p-6 text-center shadow-2xl">
                       <div className="text-amber-300 text-xs font-black tracking-[0.35em]">SELECT CONTROL MODE</div>
                       <h2 className="mt-3 text-2xl sm:text-3xl font-black">เล่นบนอุปกรณ์ไหน?</h2>
