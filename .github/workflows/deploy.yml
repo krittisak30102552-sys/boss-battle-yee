@@ -710,11 +710,11 @@ jobs:
           toggle_start = s.find("toggleSuit()")
           if toggle_start < 0:
               raise SystemExit("Existing toggleSuit method not found")
-          method_start = s.rfind("\\n", 0, toggle_start) + 1
+          method_start = s.rfind("\n", 0, toggle_start) + 1
           select_start = s.find("selectSkill", toggle_start)
           if select_start < 0:
               raise SystemExit("selectSkill method anchor missing after toggleSuit")
-          select_line = s.rfind("\\n", 0, select_start) + 1
+          select_line = s.rfind("\n", 0, select_start) + 1
           new_toggle = """  toggleSuit() {
             const active = this.suit.toggle();
             this.tonyMode = active;
