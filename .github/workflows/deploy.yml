@@ -50,40 +50,6 @@ jobs:
           test -f game/package.json
           test -f game/src/main.tsx
 
-      - name: Inspect game control and character hooks
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for name in ("src/game/Game.ts", "src/App.tsx"):
-              p = Path("game") / name
-              lines = p.read_text().splitlines()
-              print("\n===== " + name + " =====")
-              keys = ("keydown", "keyup", "Space", "Shift", "armor", "suit", "player", "model", "skill", "ability", "attack", "start()")
-              hits = [i for i, line in enumerate(lines) if any(k.lower() in line.lower() for k in keys)]
-              shown = set()
-              for i in hits:
-                  for j in range(max(0, i-3), min(len(lines), i+5)):
-                      if j not in shown:
-                          print(f"{j+1}: {lines[j]}")
-                          shown.add(j)
-          PY
-
-      - name: Inspect exact game implementation sections
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for name, ranges in {
-              "src/game/Game.ts": [(1,35),(220,340),(320,435),(530,610),(630,710),(830,890),(875,1020),(1010,1198),(1195,1320),(1560,1620),(1900,1960)],
-              "src/App.tsx": [(1,55),(75,135),(205,330),(330,470)]
-          }.items():
-              lines = (Path("game") / name).read_text().splitlines()
-              print("\n===== " + name + " =====")
-              for start, end in ranges:
-                  print(f"--- lines {start}-{end} ---")
-                  for i in range(start-1, min(end, len(lines))):
-                      print(f"{i+1}: {lines[i]}")
-          PY
-
       - name: Apply low-glare Mark 85 armor polish
         run: |
           python3 - <<'PY'
@@ -118,6 +84,156 @@ jobs:
           s = s.replace("    this.composer.setSize(w, h);\n    this.bloom.setSize(w, h);\n", "")
           s = s.replace("    this.composer.dispose();\n", "")
           s = s.replace("    this.composer.render();", "    this.renderer.render(this.scene, this.camera);")
+          p.write_text(s)
+
+          # Tony Stark mode: show Tony while the Mark 85 becomes an autonomous companion.
+          p = root / "src/game/Game.ts"
+          s = p.read_text()
+          field_anchor = "  private rig: IronRig;\n  private nano: NanoSystem;"
+          fields = """  private rig: IronRig;
+          private nano: NanoSystem;
+          private tonyMode = false;
+          private tonyRoot = new THREE.Group();
+          private suitAiTimer = 0;"""
+          if field_anchor in s and "private tonyMode = false;" not in s:
+              s = s.replace(field_anchor, fields)
+
+          build_anchor = "  private buildWorld() {"
+          tony_builder = """
+          private buildTonyModel() {
+            const root = new THREE.Group();
+            const skin = new THREE.MeshStandardMaterial({ color: 0xd6a47f, roughness: 0.82 });
+            const hair = new THREE.MeshStandardMaterial({ color: 0x4b2d20, roughness: 0.9 });
+            const shirt = new THREE.MeshStandardMaterial({ color: 0x252a35, roughness: 0.85 });
+            const pants = new THREE.MeshStandardMaterial({ color: 0x27364c, roughness: 0.9 });
+            const shoe = new THREE.MeshStandardMaterial({ color: 0x17191e, roughness: 0.9 });
+            const part = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
+              const mesh = new THREE.Mesh(geo, mat);
+              mesh.position.set(x, y, z);
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
+              root.add(mesh);
+              return mesh;
+            };
+            part(new THREE.BoxGeometry(0.72, 0.92, 0.38), shirt, 0, 1.35, 0);
+            part(new THREE.SphereGeometry(0.28, 18, 14), skin, 0, 2.02, 0);
+            part(new THREE.SphereGeometry(0.29, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, 0, 2.12, -0.015);
+            part(new THREE.BoxGeometry(0.2, 0.72, 0.22), pants, -0.19, 0.52, 0);
+            part(new THREE.BoxGeometry(0.2, 0.72, 0.22), pants, 0.19, 0.52, 0);
+            part(new THREE.BoxGeometry(0.24, 0.14, 0.36), shoe, -0.19, 0.1, 0.04);
+            part(new THREE.BoxGeometry(0.24, 0.14, 0.36), shoe, 0.19, 0.1, 0.04);
+            const armL = part(new THREE.CapsuleGeometry(0.105, 0.48, 4, 8), shirt, -0.48, 1.36, 0);
+            const armR = part(new THREE.CapsuleGeometry(0.105, 0.48, 4, 8), shirt, 0.48, 1.36, 0);
+            armL.rotation.z = -0.12;
+            armR.rotation.z = 0.12;
+            part(new THREE.SphereGeometry(0.11, 12, 10), skin, -0.5, 0.99, 0);
+            part(new THREE.SphereGeometry(0.11, 12, 10), skin, 0.5, 0.99, 0);
+            root.visible = false;
+            return root;
+          }
+
+          """
+          if build_anchor in s and "private buildTonyModel()" not in s:
+              s = s.replace(build_anchor, tony_builder + build_anchor)
+          ctor_anchor = "    this.rig = buildIronMan();\n    this.scene.add(this.rig.root);"
+          ctor_new = """    this.rig = buildIronMan();
+              this.scene.add(this.rig.root);
+              this.tonyRoot = this.buildTonyModel();
+              this.scene.add(this.tonyRoot);"""
+          if ctor_anchor in s and "this.tonyRoot = this.buildTonyModel();" not in s:
+              s = s.replace(ctor_anchor, ctor_new)
+
+          public_methods = """
+          toggleSuit() {
+            this.tonyMode = !this.tonyMode;
+            this.tonyRoot.visible = this.tonyMode;
+            this.rig.root.visible = true;
+            if (!this.tonyMode) {
+              this.rig.root.position.copy(this.pl.pos);
+              this.rig.root.rotation.set(0, this.pl.heading, 0);
+            }
+            this.suitAiTimer = 0.4;
+            return this.tonyMode;
+          }
+
+          selectSkill(index: number) {
+            this.selectWeapon(Math.max(0, Math.min(3, index)));
+          }
+
+          setAttackHeld(held: boolean) {
+            this.mouseDown = held;
+          }
+
+          touchLook(dx: number, dy: number) {
+            this.camYaw -= dx * 0.006;
+            this.camPitch = clamp(this.camPitch - dy * 0.006, -0.55, 1.15);
+          }
+
+          """
+          if "  start() {" in s and "toggleSuit()" not in s:
+              s = s.replace("  start() {", public_methods + "  start() {")
+
+          reset_anchor = "    this.rig.body.rotation.set(0, 0, 0);"
+          reset_new = """    this.rig.body.rotation.set(0, 0, 0);
+              this.tonyMode = false;
+              this.tonyRoot.visible = false;
+              this.rig.root.visible = true;
+              this.suitAiTimer = 0;"""
+          if reset_anchor in s and "this.tonyMode = false;" not in s:
+              s = s.replace(reset_anchor, reset_new)
+
+          pose_anchor = "  private updatePlayerPose(dt: number) {"
+          ai_methods = """
+          private updateSuitCompanion(dt: number) {
+            if (!this.tonyMode || this.boss.state === "dead") return;
+            const b = this.boss;
+            const r = this.rig.root;
+            const orbit = this.time * 0.72;
+            const target = this.v1.set(
+              b.pos.x + Math.cos(orbit) * 7.5,
+              3.4 + Math.sin(this.time * 2.1) * 0.8,
+              b.pos.z + Math.sin(orbit) * 7.5
+            );
+            r.position.lerp(target, Math.min(1, dt * 2.8));
+            r.rotation.y = Math.atan2(b.pos.x - r.position.x, b.pos.z - r.position.z);
+            r.rotation.x = -0.08;
+            for (const flame of this.rig.flames) {
+              flame.visible = true;
+              flame.scale.set(0.8, 0.75 + Math.sin(this.time * 18) * 0.15, 0.8);
+            }
+            this.suitAiTimer -= dt;
+            if (this.suitAiTimer <= 0) {
+              this.suitAiTimer = 1.15;
+              const from = r.position.clone().add(new THREE.Vector3(0, 1.65, 0));
+              const targetPoint = b.pos.clone().add(new THREE.Vector3(0, 3.7, 0));
+              const dir = targetPoint.sub(from).normalize();
+              const beam = new THREE.Mesh(this.boltGeo, this.boltMat);
+              beam.position.copy(from);
+              beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+              this.scene.add(beam);
+              this.projs.push({ mesh: beam, vel: dir.multiplyScalar(78), life: 1.7, dmg: 10, owner: "p", r: 0.32, kind: "bolt", power: 0 });
+              this.fx.spawn(from.x, from.y, from.z, dir.x * 5, dir.y * 5, dir.z * 5, 0.22, 0.14, new THREE.Color(0.8, 2, 2.8));
+            }
+          }
+
+          """
+          if pose_anchor in s and "private updateSuitCompanion(dt: number)" not in s:
+              s = s.replace(pose_anchor, ai_methods + pose_anchor)
+          pose_branch = """    const dead = this.status === "lost";
+
+              r.root.position.copy(p.pos);"""
+          pose_branch_new = """    const dead = this.status === "lost";
+              if (this.tonyMode) {
+                this.tonyRoot.position.copy(p.pos);
+                this.tonyRoot.position.y += Math.sin(this.time * 5) * 0.025;
+                this.tonyRoot.rotation.y = p.heading;
+                return;
+              }
+
+              r.root.position.copy(p.pos);"""
+          if pose_branch in s:
+              s = s.replace(pose_branch, pose_branch_new)
+          s = s.replace("    this.updatePlayerPose(dt);\n", "    this.updatePlayerPose(dt);\n    this.updateSuitCompanion(dt);\n")
           p.write_text(s)
 
           # Correct all UI copy to the sleek Iron Man Mark 85 from Endgame.
@@ -304,6 +420,58 @@ jobs:
               s = s[:line_start] + overlay + chr(10) + s[line_start:]
           p.write_text(s)
 
+          # Mobile actions: weapon selection, held attack, repair, dash, flight and suit toggle.
+          if 'const [tonyMode, setTonyMode]' not in s:
+              s = s.replace(
+                  'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);',
+                  'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);\n  const [tonyMode, setTonyMode] = useState(false);'
+              )
+          s = s.replace(
+              'window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, movementX: dx, movementY: dy }));',
+              'gameRef.current?.touchLook(dx, dy);'
+          )
+          s = s.replace('absolute bottom-24 right-3 flex flex-col items-center gap-2', 'hidden')
+          action_pad = """
+                {showHud && deviceMode === "mobile" && hud.status === "playing" && (
+                  <div className="pointer-events-none absolute inset-0 z-40">
+                    <div className="pointer-events-auto absolute bottom-5 right-3 flex max-w-[52vw] flex-col items-end gap-2 touch-none">
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {WEAPON_INFO.map((w, index) => (
+                          <button key={w.key} type="button" onPointerDown={(e) => e.preventDefault()}
+                            onClick={() => gameRef.current?.selectSkill(index)}
+                            className="min-w-[66px] rounded-lg border border-cyan-200/50 bg-slate-950/85 px-2 py-2 text-[11px] font-black text-cyan-100 active:bg-cyan-500/60">
+                            {index + 1} · {w.th}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button type="button"
+                          onPointerDown={(e) => { e.preventDefault(); gameRef.current?.setAttackHeld(true); }}
+                          onPointerUp={() => gameRef.current?.setAttackHeld(false)}
+                          onPointerCancel={() => gameRef.current?.setAttackHeld(false)}
+                          onLostPointerCapture={() => gameRef.current?.setAttackHeld(false)}
+                          className="rounded-xl border border-amber-300/70 bg-red-700/85 px-4 py-3 text-sm font-black text-white active:scale-95">โจมตี</button>
+                        <button type="button" onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR", bubbles: true }))}
+                          className="rounded-xl border border-emerald-300/60 bg-emerald-900/80 px-3 py-3 text-xs font-black text-white active:scale-95">ซ่อมเกราะ</button>
+                        {holdKey("ShiftLeft", "พุ่ง", "w-full h-11 text-xs")}
+                        {holdKey("Space", "บิน", "w-full h-11 text-xs")}
+                      </div>
+                      <button type="button"
+                        onClick={() => { const active = gameRef.current?.toggleSuit() ?? false; setTonyMode(active); }}
+                        className={tonyMode ? "w-full rounded-xl border border-amber-300 bg-amber-500/25 px-3 py-3 text-xs font-black text-amber-100" : "w-full rounded-xl border border-white/40 bg-black/80 px-3 py-3 text-xs font-black text-white"}>
+                        {tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+          """
+          menu_anchor = 'MENU ---------------- */}'
+          if menu_anchor in s and "ถอดชุด · โทนี่กะต๊าก" not in s:
+              idx = s.index(menu_anchor)
+              line_start = s.rfind(chr(10), 0, idx) + 1
+              s = s[:line_start] + action_pad + chr(10) + s[line_start:]
+          p.write_text(s)
+
           # Correct remaining armor labels while preserving the original game model.
           s = s.replace("MARK 51 · เกราะ", "MARK 85 · NANOTECH")
           s = s.replace("MK-51", "MK-85")
@@ -324,6 +492,9 @@ jobs:
               "chooser is top-layer": "fixed inset-0 z-[99999]" in s,
               "mobile joystick exists": "data-stick-knob" in s,
               "obsolete download buttons removed": "<DownloadButtons />" not in s,
+              "mobile skill controls": "gameRef.current?.selectSkill(index)" in s,
+              "mobile attack hold": "setAttackHeld(true)" in s,
+              "Tony Stark toggle": "ถอดชุด · โทนี่กะต๊าก" in s,
           }
           for name, ok in checks.items():
               print(("PASS" if ok else "FAIL") + ": " + name)
