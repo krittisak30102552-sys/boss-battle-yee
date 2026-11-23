@@ -244,11 +244,14 @@ jobs:
               root.position.lerp(destination, Math.min(1, dt * 4.5));
               root.rotation.y = this.pl.heading;
               if (t >= 1) {
-                parts.forEach((part) => {
+                parts.forEach((part, i) => {
                   const data = part.userData as any;
                   data.__suitBasePos ??= part.position.clone();
                   data.__suitBaseRot ??= part.rotation.clone();
                   data.__suitBaseScale ??= part.scale.clone();
+                  const angle = (i / Math.max(1, parts.length)) * Math.PI * 2;
+                  part.position.copy(data.__suitBasePos).add(new THREE.Vector3(Math.cos(angle) * 2.2, 1.1 + (i % 3) * 0.35, Math.sin(angle) * 2.2));
+                  data.__suitStartPos = part.position.clone();
                   part.visible = true;
                   part.scale.setScalar(0.001);
                 });
@@ -266,7 +269,11 @@ jobs:
                 const t = Math.max(0, Math.min(1, local / duration));
                 part.visible = local >= 0;
                 const baseScale = data.__suitBaseScale as THREE.Vector3;
-                if (part.visible) part.scale.copy(baseScale).multiplyScalar(0.001 + 0.999 * (t * (2 - t)));
+                if (part.visible) {
+                  const ease = t * (2 - t);
+                  part.position.lerp(data.__suitBasePos, ease);
+                  part.scale.copy(baseScale).multiplyScalar(0.001 + 0.999 * ease);
+                }
                 if (t >= 1) {
                   part.position.copy(data.__suitBasePos);
                   part.rotation.copy(data.__suitBaseRot);
@@ -602,6 +609,7 @@ jobs:
               "mobile keys include key and code": 'key: code.startsWith("Key")' in s,
               "suit removal opens pieces before flight": '"remove-open"' in g and '"remove-fly"' in g,
               "suit returns piece by piece": '"put-assemble"' in g and "pieceDelay = 0.13" in g,
+              "suit assembly updates every frame": "this.updateSuitAssembly(dt);" in g,
               "chooser state": "const [chooseMode, setChooseMode] = useState(false);" in s,
               "device mode state": 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);' in s,
               "start opens chooser": "onClick={() => setChooseMode(true)}" in s,
