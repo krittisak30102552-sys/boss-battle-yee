@@ -615,8 +615,8 @@ jobs:
                           onPointerCancel={() => gameRef.current?.setAttackHeld(false)}
                           onLostPointerCapture={() => gameRef.current?.setAttackHeld(false)}
                           className="rounded-xl border border-amber-300/70 bg-red-700/85 px-4 py-3 text-sm font-black text-white active:scale-95">โจมตี</button>
-                        <button type="button" onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyH", key: "h", bubbles: true }))}
-                          className="rounded-xl border border-emerald-300/60 bg-emerald-900/80 px-3 py-3 text-xs font-black text-white active:scale-95">ซ่อมเกราะ [H]</button>
+                        <button type="button" onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyT", key: "t", bubbles: true }))}
+                          className="rounded-xl border border-emerald-300/60 bg-emerald-900/80 px-3 py-3 text-xs font-black text-white active:scale-95">ซ่อมเกราะ [T]</button>
                         {holdKey("ShiftLeft", "พุ่ง", "w-full h-11 text-xs")}
                         {holdKey("Space", "บิน", "w-full h-11 text-xs")}
                       </div>
@@ -757,12 +757,12 @@ jobs:
           s = s.replace("tony: this.tonyMode,", "tony: this.suit.active,")
           s = s.replace("suitBusy: this.suitAnimMode !== \"none\",", "suitBusy: this.suit.mode !== \"none\",")
 
-          # R toggles the suit; H is reserved for armor repair.
-          s = s.replace('if (e.code === "KeyR") this.heal();', 'if (e.code === "KeyH") this.heal();')
+          # R toggles the suit; T repairs armor. Keep desktop and mobile bindings aligned.
+          s = s.replace('if (e.code === "KeyR") this.heal();', 'if (e.code === "KeyT") this.heal();')
           if 'if (e.code === "KeyR") this.toggleSuit();' not in s:
-              anchor = '      if (e.code === "KeyH") this.heal();'
+              anchor = '      if (e.code === "KeyT") this.heal();'
               if anchor not in s:
-                  raise SystemExit("Repair key anchor missing; cannot safely remap suit key")
+                  raise SystemExit("Repair key anchor missing; cannot safely map T")
               s = s.replace(anchor, anchor + '\n      if (e.code === "KeyR") this.toggleSuit();')
 
           p.write_text(s)
@@ -783,7 +783,7 @@ jobs:
               "Tony animation updates while unarmored": "this.suit.poseTony(dt, this.time" in g,
               "suit toggle API": "toggleSuit()" in g,
               "R toggles the suit": 'if (e.code === "KeyR") this.toggleSuit();' in g,
-              "H repairs armor": 'if (e.code === "KeyH") this.heal();' in g,
+              "T repairs armor": 'if (e.code === "KeyT") this.heal();' in g,
               "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
               "camera drag covers blank screen": 'absolute inset-0 z-10 touch-none' in s,
               "camera drag calls touchLook directly": "gameRef.current?.touchLook(dx, dy)" in s,
@@ -792,7 +792,7 @@ jobs:
               "mobile suit toggle uses pointerup": "gameRef.current?.toggleSuit()" in s and "onPointerUp" in s,
               "mobile attack hold": "setAttackHeld(true)" in s,
               "skill four has an adjacent info label": 'index === 3 && (' in s and '"สกิลพิเศษ"' in s,
-              "mobile repair key is H": 'code: "KeyH", key: "h"' in s,
+              "mobile repair key is T": 'code: "KeyT", key: "t"' in s,
               "device chooser exists": "SELECT CONTROL MODE" in s,
               "Tony label exists": "ถอดชุด" in s and "MK-85" in s,
           }
