@@ -706,18 +706,24 @@ jobs:
                   raise SystemExit("player pose method anchor missing")
               s = s.replace(anchor, hidden + anchor)
 
-          pattern = r"  toggleSuit\(\) \{.*?\n  \}\n\n  selectSkill"
-          replacement = """  toggleSuit() {
+          # Replace only the existing toggleSuit method, regardless of whitespace.
+          toggle_start = s.find("toggleSuit()")
+          if toggle_start < 0:
+              raise SystemExit("Existing toggleSuit method not found")
+          method_start = s.rfind("\\n", 0, toggle_start) + 1
+          select_start = s.find("selectSkill", toggle_start)
+          if select_start < 0:
+              raise SystemExit("selectSkill method anchor missing after toggleSuit")
+          select_line = s.rfind("\\n", 0, select_start) + 1
+          new_toggle = """  toggleSuit() {
             const active = this.suit.toggle();
             this.tonyMode = active;
             this.tonyRoot.visible = false;
             return active;
           }
 
-          selectSkill"""
-          s, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
-          if n != 1:
-              raise SystemExit("Could not replace old suit toggle")
+          """
+          s = s[:method_start] + new_toggle + s[select_line:]
 
           pose_pattern = r"if \\(this\\.tonyMode\\) \\{.*?return;\\s*\\}"
           new_pose = """if (this.suit.active) {
