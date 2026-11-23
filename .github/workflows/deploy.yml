@@ -594,11 +594,18 @@ jobs:
                     <div className="pointer-events-auto absolute bottom-5 right-3 flex max-w-[52vw] flex-col items-end gap-2 touch-none">
                       <div className="grid grid-cols-2 gap-1.5">
                         {WEAPON_INFO.map((w, index) => (
-                          <button key={w.key} type="button"
-                            onPointerUp={(e) => { e.preventDefault(); gameRef.current?.selectSkill(index); }}
-                            className="min-w-[66px] rounded-lg border border-cyan-200/50 bg-slate-950/85 px-2 py-2 text-[11px] font-black text-cyan-100 active:bg-cyan-500/60">
-                            {index + 1} · {w.th}
-                          </button>
+                          <div key={w.key} className={index === 3 ? "col-span-2 flex items-center gap-2" : ""}>
+                            <button type="button"
+                              onPointerUp={(e) => { e.preventDefault(); gameRef.current?.selectSkill(index); }}
+                              className={index === 3 ? "min-w-[66px] flex-1 rounded-lg border border-cyan-200/50 bg-slate-950/85 px-2 py-2 text-[11px] font-black text-cyan-100 active:bg-cyan-500/60" : "min-w-[66px] w-full rounded-lg border border-cyan-200/50 bg-slate-950/85 px-2 py-2 text-[11px] font-black text-cyan-100 active:bg-cyan-500/60"}>
+                              {index + 1} · {w.th}
+                            </button>
+                            {index === 3 && (
+                              <span className="whitespace-nowrap rounded-md border border-amber-300/50 bg-slate-950/90 px-2 py-1 text-[10px] font-bold text-amber-200">
+                                {(w as any).description || (w as any).desc || (w as any).info || "สกิลพิเศษ"}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
@@ -608,8 +615,8 @@ jobs:
                           onPointerCancel={() => gameRef.current?.setAttackHeld(false)}
                           onLostPointerCapture={() => gameRef.current?.setAttackHeld(false)}
                           className="rounded-xl border border-amber-300/70 bg-red-700/85 px-4 py-3 text-sm font-black text-white active:scale-95">โจมตี</button>
-                        <button type="button" onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR", key: "r", bubbles: true }))}
-                          className="rounded-xl border border-emerald-300/60 bg-emerald-900/80 px-3 py-3 text-xs font-black text-white active:scale-95">ซ่อมเกราะ</button>
+                        <button type="button" onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyH", key: "h", bubbles: true }))}
+                          className="rounded-xl border border-emerald-300/60 bg-emerald-900/80 px-3 py-3 text-xs font-black text-white active:scale-95">ซ่อมเกราะ [H]</button>
                         {holdKey("ShiftLeft", "พุ่ง", "w-full h-11 text-xs")}
                         {holdKey("Space", "บิน", "w-full h-11 text-xs")}
                       </div>
@@ -750,11 +757,13 @@ jobs:
           s = s.replace("tony: this.tonyMode,", "tony: this.suit.active,")
           s = s.replace("suitBusy: this.suitAnimMode !== \"none\",", "suitBusy: this.suit.mode !== \"none\",")
 
-          # Keep the existing player combat/input code untouched; O toggles the suit state.
-          if 'if (e.code === "KeyO") this.toggleSuit();' not in s:
-              anchor = '      if (e.code === "KeyR") this.heal();'
-              if anchor in s:
-                  s = s.replace(anchor, anchor + '\n      if (e.code === "KeyO") this.toggleSuit();')
+          # R toggles the suit; H is reserved for armor repair.
+          s = s.replace('if (e.code === "KeyR") this.heal();', 'if (e.code === "KeyH") this.heal();')
+          if 'if (e.code === "KeyR") this.toggleSuit();' not in s:
+              anchor = '      if (e.code === "KeyH") this.heal();'
+              if anchor not in s:
+                  raise SystemExit("Repair key anchor missing; cannot safely remap suit key")
+              s = s.replace(anchor, anchor + '\n      if (e.code === "KeyR") this.toggleSuit();')
 
           p.write_text(s)
           PY
@@ -773,6 +782,8 @@ jobs:
               "suit animation updates each frame": "this.suit.update(dt, this.time);" in g,
               "Tony animation updates while unarmored": "this.suit.poseTony(dt, this.time" in g,
               "suit toggle API": "toggleSuit()" in g,
+              "R toggles the suit": 'if (e.code === "KeyR") this.toggleSuit();' in g,
+              "H repairs armor": 'if (e.code === "KeyH") this.heal();' in g,
               "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
               "camera drag covers blank screen": 'absolute inset-0 z-10 touch-none' in s,
               "camera drag calls touchLook directly": "gameRef.current?.touchLook(dx, dy)" in s,
@@ -780,6 +791,8 @@ jobs:
               "mobile skill controls use touch pointerup": "onPointerUp={(e) => { e.preventDefault(); gameRef.current?.selectSkill(index); }}" in s,
               "mobile suit toggle uses pointerup": "gameRef.current?.toggleSuit()" in s and "onPointerUp" in s,
               "mobile attack hold": "setAttackHeld(true)" in s,
+              "skill four has an adjacent info label": 'index === 3 && (' in s and '"สกิลพิเศษ"' in s,
+              "mobile repair key is H": 'code: "KeyH", key: "h"' in s,
               "device chooser exists": "SELECT CONTROL MODE" in s,
               "Tony label exists": "ถอดชุด" in s and "MK-85" in s,
           }
