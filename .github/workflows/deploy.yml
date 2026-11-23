@@ -105,14 +105,17 @@ jobs:
           # Add a device chooser and touch movement/camera controls to the React UI.
           p = root / "src/App.tsx"
           s = p.read_text()
-          s = s.replace(
-              '  const [error, setError] = useState("");',
-              '  const [error, setError] = useState("");\n  const [chooseMode, setChooseMode] = useState(false);\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);'
+          import re
+          s, state_count = re.subn(
+              r'(?m)^(\\s*)const \\[error, setError\\] = useState\\(\\"\\"\\);$',
+              lambda m: m.group(0) + '\\n' + m.group(1) + 'const [chooseMode, setChooseMode] = useState(false);\\n' + m.group(1) + 'const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);',
+              s, count=1
           )
-          s = s.replace(
-              'onClick={() => gameRef.current?.start()}',
-              'onClick={() => setChooseMode(true)}'
+          s, start_count = re.subn(
+              r'onClick=\\{\\(\\) => gameRef\\.current\\?\\.start\\(\\)\\}',
+              'onClick={() => setChooseMode(true)}', s, count=1
           )
+          print("chooser state/start matches:", state_count, start_count)
           chooser = """
                 {chooseMode && (
                   <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/95 p-5">
@@ -137,9 +140,11 @@ jobs:
                   </div>
                 )}
           """
-          anchor = '      {/* ---------------- PAUSE ---------------- */}'
+          anchor = 'PAUSE ---------------- */}'
           if anchor in s and 'SELECT CONTROL MODE' not in s:
-              s = s.replace(anchor, chooser + '\n      ' + anchor)
+              idx = s.index(anchor)
+              line_start = s.rfind(chr(10), 0, idx) + 1
+              s = s[:line_start] + chooser + chr(10) + s[line_start:]
 
           mobile = """
                 {showHud && deviceMode === "mobile" && hud.status === "playing" && (
@@ -185,9 +190,11 @@ jobs:
           if helper_anchor in s and 'const holdKey = ' not in s:
               s = s.replace(helper_anchor, helper + '\n  ' + helper_anchor)
           # Insert touch overlay inside the main app, immediately before the menu.
-          menu_anchor = '      {/* ---------------- MENU ---------------- */}'
+          menu_anchor = 'MENU ---------------- */}'
           if menu_anchor in s and 'deviceMode === "mobile"' not in s:
-              s = s.replace(menu_anchor, mobile + '\n      ' + menu_anchor)
+              idx = s.index(menu_anchor)
+              line_start = s.rfind(chr(10), 0, idx) + 1
+              s = s[:line_start] + mobile + chr(10) + s[line_start:]
 
           # Upgrade touch controls: circular joystick for movement and swipe-to-look camera.
           p = root / "src/App.tsx"
@@ -260,7 +267,9 @@ jobs:
                 )}
           """
           if mobile_anchor in s and "data-stick-knob" not in s:
-              s = s.replace(mobile_anchor, overlay + "\n      " + mobile_anchor)
+              idx = s.index(mobile_anchor)
+              line_start = s.rfind(chr(10), 0, idx) + 1
+              s = s[:line_start] + overlay + chr(10) + s[line_start:]
           p.write_text(s)
 
           # Correct remaining armor labels while preserving the original game model.
