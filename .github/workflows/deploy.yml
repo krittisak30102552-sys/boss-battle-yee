@@ -750,11 +750,11 @@ jobs:
           s = s.replace("tony: this.tonyMode,", "tony: this.suit.active,")
           s = s.replace("suitBusy: this.suitAnimMode !== \"none\",", "suitBusy: this.suit.mode !== \"none\",")
 
-          # Keep the existing player combat/input code untouched; T only switches the suit state.
-          if 'if (e.code === "KeyT") this.toggleSuit();' not in s:
+          # Keep the existing player combat/input code untouched; O toggles the suit state.
+          if 'if (e.code === "KeyO") this.toggleSuit();' not in s:
               anchor = '      if (e.code === "KeyR") this.heal();'
               if anchor in s:
-                  s = s.replace(anchor, anchor + '\n      if (e.code === "KeyT") this.toggleSuit();')
+                  s = s.replace(anchor, anchor + '\n      if (e.code === "KeyO") this.toggleSuit();')
 
           p.write_text(s)
           PY
