@@ -813,6 +813,7 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v6
 
+      # Fresh workflow runs keep exactly one Pages artifact for deployment.
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
