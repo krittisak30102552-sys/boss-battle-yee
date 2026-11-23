@@ -505,26 +505,33 @@ jobs:
           overlay = """
                 {showHud && deviceMode === "mobile" && hud.status === "playing" && (
                   <>
-                    <div className="pointer-events-auto absolute bottom-7 left-5 z-30 flex h-36 w-36 touch-none items-center justify-center rounded-full border-2 border-white/40 bg-black/40 shadow-xl"
+                    <div data-stick-area className="pointer-events-auto absolute bottom-7 left-5 z-30 flex h-36 w-36 touch-none items-center justify-center rounded-full border-2 border-white/50 bg-black/45 shadow-xl"
                       onPointerDown={(e) => { e.preventDefault(); stickPointerRef.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); moveStick(e); }}
                       onPointerMove={(e) => { if (stickPointerRef.current === e.pointerId) moveStick(e); }}
                       onPointerUp={() => { stickPointerRef.current = null; releaseStick(); }} onPointerCancel={() => { stickPointerRef.current = null; releaseStick(); }} onLostPointerCapture={() => { stickPointerRef.current = null; releaseStick(); }}>
                       <div className="pointer-events-none absolute h-24 w-24 rounded-full border border-white/25" />
                       <div data-stick-knob className="pointer-events-none absolute h-14 w-14 rounded-full border-2 border-cyan-200 bg-cyan-400/50 shadow-lg" />
                     </div>
-                    <div className="pointer-events-auto absolute inset-y-0 right-0 z-10 w-1/2 touch-none"
-                      onPointerDown={(e) => { cameraTouchRef.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
+                    <div className="pointer-events-auto absolute inset-0 z-10 touch-none"
+                      onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest("button, [data-stick-area]")) return;
+                        e.preventDefault();
+                        cameraTouchRef.current = { x: e.clientX, y: e.clientY };
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                      }}
                       onPointerMove={(e) => {
                         const prev = cameraTouchRef.current;
                         if (!prev) return;
+                        e.preventDefault();
                         const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
                         cameraTouchRef.current = { x: e.clientX, y: e.clientY };
-                        window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, movementX: dx, movementY: dy }));
+                        gameRef.current?.touchLook(dx, dy);
                       }}
                       onPointerUp={() => { cameraTouchRef.current = null; }}
                       onPointerCancel={() => { cameraTouchRef.current = null; }}
+                      onLostPointerCapture={() => { cameraTouchRef.current = null; }}
                     />
-                    <div className="pointer-events-none absolute bottom-3 right-4 z-30 text-[10px] font-bold text-white/60">ลากฝั่งขวาเพื่อหมุนกล้อง</div>
+                    <div className="pointer-events-none absolute bottom-3 right-4 z-30 text-[10px] font-bold text-white/60">แตะพื้นที่ว่างแล้วลากเพื่อหมุนกล้อง</div>
                   </>
                 )}
           """
@@ -605,6 +612,9 @@ jobs:
               "autonomous suit AI": "private updateSuitCompanion(dt: number)" in g,
               "autonomous suit AI runs each frame": "this.updateSuitCompanion(dt);" in g,
               "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
+              "camera drag covers blank screen": 'absolute inset-0 z-10 touch-none' in s,
+              "camera drag calls touchLook directly": "gameRef.current?.touchLook(dx, dy)" in s,
+              "joystick has fixed outer ring": "data-stick-area" in s and "h-36 w-36" in s,
               "mobile key events bubble from document": "document.dispatchEvent(new KeyboardEvent" in s,
               "mobile keys include key and code": 'key: code.startsWith("Key")' in s,
               "suit removal opens pieces before flight": '"remove-open"' in g and '"remove-fly"' in g,
