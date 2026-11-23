@@ -91,6 +91,7 @@ jobs:
           s = p.read_text()
           s = s.replace("MARK 51 · เกราะ", "MARK 85 · NANOTECH")
           s = s.replace("MK-51", "MK-85")
+          s = s.replace("          <DownloadButtons />", "")
           s = s.replace("MODEL 52 · HULKBUSTER", "MARK 85 · NANOTECH")
           s = s.replace("MODEL 52", "MK-85")
           s = s.replace(
