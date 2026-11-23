@@ -725,7 +725,7 @@ jobs:
           """
           s = s[:method_start] + new_toggle + s[select_line:]
 
-          pose_pattern = r"if \\(this\\.tonyMode\\) \\{.*?return;\\s*\\}"
+          pose_pattern = r"if \(this\.tonyMode\) \{.*?return;\s*\}"
           new_pose = """if (this.suit.active) {
                 this.suit.poseTony(dt, this.time, { pos: p.pos, heading: p.heading, speed, walk: p.walk, grounded, camPitch: this.camPitch });
                 return;
