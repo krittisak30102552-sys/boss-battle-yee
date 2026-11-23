@@ -571,7 +571,6 @@ jobs:
                       onLostPointerCapture={() => { cameraTouchRef.current = null; }}
                     />"""
           s = s.replace(camera_old, camera_new)
-          s = s.replace('absolute bottom-7 left-5 z-30 flex h-36 w-36', 'data-stick-area className="pointer-events-auto absolute bottom-7 left-5 z-30 flex h-36 w-36')
           s = s.replace('border-2 border-white/40 bg-black/40 shadow-xl', 'border-2 border-white/50 bg-black/45 shadow-xl')
           p.write_text(s)
 
