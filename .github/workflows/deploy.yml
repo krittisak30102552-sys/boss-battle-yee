@@ -694,9 +694,9 @@ jobs:
 
           """
           if "private setWeaponHidden(hide: boolean)" not in s:
-              anchor = "  private updateSuitAssembly(dt: number) {"
+              anchor = "  private updatePlayerPose(dt: number) {"
               if anchor not in s:
-                  raise SystemExit("suit animation method anchor missing")
+                  raise SystemExit("player pose method anchor missing")
               s = s.replace(anchor, hidden + anchor)
 
           pattern = r"  toggleSuit\(\) \{.*?\n  \}\n\n  selectSkill"
