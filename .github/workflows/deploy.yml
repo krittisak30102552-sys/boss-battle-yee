@@ -712,19 +712,13 @@ jobs:
           if n != 1:
               raise SystemExit("Could not replace old suit toggle")
 
-          old_pose = """    if (this.tonyMode) {
-                this.tonyRoot.position.copy(p.pos);
-                this.tonyRoot.position.y += Math.sin(this.time * 5) * 0.025;
-                this.tonyRoot.rotation.y = p.heading;
-                return;
-              }"""
-          new_pose = """    if (this.suit.active) {
+          pose_pattern = r"if \\(this\\.tonyMode\\) \\{.*?return;\\s*\\}"
+          new_pose = """if (this.suit.active) {
                 this.suit.poseTony(dt, this.time, { pos: p.pos, heading: p.heading, speed, walk: p.walk, grounded, camPitch: this.camPitch });
                 return;
               }"""
-          if old_pose in s:
-              s = s.replace(old_pose, new_pose)
-          elif "this.suit.poseTony(dt, this.time" not in s:
+          s, pose_count = re.subn(pose_pattern, new_pose, s, count=1, flags=re.S)
+          if pose_count != 1 and "this.suit.poseTony(dt, this.time" not in s:
               raise SystemExit("Tony pose branch anchor missing")
 
           s = s.replace(
