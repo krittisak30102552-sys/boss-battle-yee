@@ -61,13 +61,13 @@ jobs:
           p = root / "src/game/Game.ts"
           s = p.read_text()
           for line in (
-              'import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";\\n',
-              'import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";\\n',
-              'import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";\\n',
-              'import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";\\n',
+              'import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";\n',
+              'import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";\n',
+              'import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";\n',
+              'import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";\n',
           ):
               s = s.replace(line, "")
-          s = s.replace("  private composer: EffectComposer;\\n  private bloom: UnrealBloomPass;\\n", "")
+          s = s.replace("  private composer: EffectComposer;\n  private bloom: UnrealBloomPass;\n", "")
           bloom = """    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 });
               this.composer = new EffectComposer(this.renderer, rt);
               this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -81,8 +81,8 @@ jobs:
               s = s.replace(bloom, "")
           s = s.replace("this.renderer.toneMappingExposure = 1.05;", "this.renderer.toneMappingExposure = 0.9;")
           s = s.replace("scene.environmentIntensity = 0.55;", "scene.environmentIntensity = 0.3;")
-          s = s.replace("    this.composer.setSize(w, h);\\n    this.bloom.setSize(w, h);\\n", "")
-          s = s.replace("    this.composer.dispose();\\n", "")
+          s = s.replace("    this.composer.setSize(w, h);\n    this.bloom.setSize(w, h);\n", "")
+          s = s.replace("    this.composer.dispose();\n", "")
           s = s.replace("    this.composer.render();", "    this.renderer.render(this.scene, this.camera);")
           p.write_text(s)
 
@@ -106,7 +106,7 @@ jobs:
           s = p.read_text()
           s = s.replace(
               '  const [error, setError] = useState("");',
-              '  const [error, setError] = useState("");\\n  const [chooseMode, setChooseMode] = useState(false);\\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);'
+              '  const [error, setError] = useState("");\n  const [chooseMode, setChooseMode] = useState(false);\n  const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);'
           )
           s = s.replace(
               'onClick={() => gameRef.current?.start()}',
@@ -138,7 +138,7 @@ jobs:
           """
           anchor = '      {/* ---------------- PAUSE ---------------- */}'
           if anchor in s and 'SELECT CONTROL MODE' not in s:
-              s = s.replace(anchor, chooser + '\\n      ' + anchor)
+              s = s.replace(anchor, chooser + '\n      ' + anchor)
 
           mobile = """
                 {showHud && deviceMode === "mobile" && hud.status === "playing" && (
@@ -182,11 +182,11 @@ jobs:
           );
           '''
           if helper_anchor in s and 'const holdKey = ' not in s:
-              s = s.replace(helper_anchor, helper + '\\n  ' + helper_anchor)
+              s = s.replace(helper_anchor, helper + '\n  ' + helper_anchor)
           # Insert touch overlay inside the main app, immediately before the menu.
           menu_anchor = '      {/* ---------------- MENU ---------------- */}'
           if menu_anchor in s and 'deviceMode === "mobile"' not in s:
-              s = s.replace(menu_anchor, mobile + '\\n      ' + menu_anchor)
+              s = s.replace(menu_anchor, mobile + '\n      ' + menu_anchor)
 
           # Correct remaining armor labels while preserving the original game model.
           s = s.replace("MARK 51 · เกราะ", "MARK 85 · NANOTECH")
