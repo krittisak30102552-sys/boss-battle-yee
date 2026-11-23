@@ -188,76 +188,13 @@ jobs:
           if menu_anchor in s and 'deviceMode === "mobile"' not in s:
               s = s.replace(menu_anchor, mobile + '\n      ' + menu_anchor)
 
-          # Replace the mobile D-pad with a circular virtual joystick and add swipe camera control.
+          # Upgrade touch controls: circular joystick for movement and swipe-to-look camera.
           p = root / "src/App.tsx"
           s = p.read_text()
-          old_mobile = """                {showHud && deviceMode === "mobile" && hud.status === "playing" && (
-                  <div className="pointer-events-none absolute inset-0 z-20 touch-none">
-                    <div className="pointer-events-auto absolute bottom-24 left-3 grid grid-cols-3 gap-1.5">
-                      <span />
-                      {holdKey("KeyW", "▲", "col-start-2")}
-                      <span />
-                      {holdKey("KeyA", "◀", "")}
-                      {holdKey("KeyS", "▼", "")}
-                      {holdKey("KeyD", "▶", "")}
-                    </div>
-                    <div className="pointer-events-auto absolute bottom-24 right-3 flex flex-col items-center gap-2">
-                      {holdKey("Space", "กระโดด / บิน", "w-28 h-14 text-xs")}
-                      {holdKey("ShiftLeft", "พุ่งหลบ", "w-28 h-11 text-xs")}
-                      <div className="grid grid-cols-3 gap-1">
-                        <span />
-                        {holdKey("ArrowUp", "กล้อง ▲", "w-12 h-10 text-[10px]")}
-                        <span />
-                        {holdKey("ArrowLeft", "◀", "w-12 h-10")}
-                        {holdKey("ArrowDown", "▼", "w-12 h-10")}
-                        {holdKey("ArrowRight", "▶", "w-12 h-10")}
-                      </div>
-                    </div>
-                  </div>
-                )}
-          """
-          new_mobile = """                {showHud && deviceMode === "mobile" && hud.status === "playing" && (
-                  <div className="pointer-events-none absolute inset-0 z-20 select-none touch-none">
-                    <div className="pointer-events-auto absolute bottom-8 left-5 flex h-36 w-36 items-center justify-center rounded-full border-2 border-white/35 bg-black/35 shadow-xl"
-                      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); moveStick(e); }}
-                      onPointerMove={(e) => { if (e.buttons || e.pressure > 0) moveStick(e); }}
-                      onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
-                      <div className="pointer-events-none absolute h-24 w-24 rounded-full border border-white/20" />
-                      <div data-stick-knob className="pointer-events-none absolute h-14 w-14 rounded-full border-2 border-cyan-200/80 bg-cyan-400/45 shadow-lg" />
-                    </div>
-                    <div className="pointer-events-auto absolute bottom-8 right-4 flex flex-col items-end gap-3">
-                      <div className="text-[10px] font-bold tracking-widest text-white/65">ลากนิ้วเพื่อหมุนกล้อง</div>
-                      <div className="flex gap-2">
-                        {holdKey("Space", "กระโดด / บิน", "w-24 h-12 text-[11px]")}
-                        {holdKey("ShiftLeft", "พุ่งหลบ", "w-20 h-12 text-[11px]")}
-                      </div>
-                    </div>
-                    <div className="pointer-events-auto absolute inset-y-0 right-0 w-1/2 touch-none"
-                      style={{ zIndex: -1 }}
-                      onPointerDown={(e) => { cameraTouchRef.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
-                      onPointerMove={(e) => {
-                        const prev = cameraTouchRef.current;
-                        if (!prev) return;
-                        const dx = e.clientX - prev.x;
-                        const dy = e.clientY - prev.y;
-                        cameraTouchRef.current = { x: e.clientX, y: e.clientY };
-                        if (Math.abs(dx) + Math.abs(dy) > 0) {
-                          window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, movementX: dx, movementY: dy }));
-                        }
-                      }}
-                      onPointerUp={() => { cameraTouchRef.current = null; }}
-                      onPointerCancel={() => { cameraTouchRef.current = null; }}
-                    />
-                  </div>
-                )}
-          """
-          if old_mobile in s:
-              s = s.replace(old_mobile, new_mobile)
-          else:
-              raise SystemExit("Could not find the existing mobile controls block; refusing to apply a partial patch.")
-
+          s = s.replace('absolute bottom-24 left-3 grid grid-cols-3 gap-1.5', 'hidden')
+          s = s.replace('<div className="grid grid-cols-3 gap-1">', '<div className="hidden">')
           helper_anchor = '  const bossPct = hud.bossHp / hud.bossMax;'
-          joystick_helpers = """
+          helpers = """
           const cameraTouchRef = useRef<{ x: number; y: number } | null>(null);
           const virtualKeysRef = useRef<Set<string>>(new Set());
           const setVirtualKey = (code: string, down: boolean) => {
@@ -272,15 +209,12 @@ jobs:
           };
           const moveStick = (e: React.PointerEvent<HTMLDivElement>) => {
             const rect = e.currentTarget.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
+            const dx = e.clientX - (rect.left + rect.width / 2);
+            const dy = e.clientY - (rect.top + rect.height / 2);
             const max = rect.width * 0.34;
-            const dx = e.clientX - cx;
-            const dy = e.clientY - cy;
             const distance = Math.hypot(dx, dy) || 1;
             const scale = Math.min(1, max / distance);
-            const x = dx * scale;
-            const y = dy * scale;
+            const x = dx * scale, y = dy * scale;
             const knob = e.currentTarget.querySelector<HTMLElement>("[data-stick-knob]");
             if (knob) knob.style.transform = "translate(" + x + "px," + y + "px)";
             const dead = rect.width * 0.13;
@@ -296,7 +230,36 @@ jobs:
           };
           """
           if helper_anchor in s and "const cameraTouchRef" not in s:
-              s = s.replace(helper_anchor, joystick_helpers + "\\n  " + helper_anchor)
+              s = s.replace(helper_anchor, helpers + "\\n  " + helper_anchor)
+          mobile_anchor = '      {/* ---------------- MENU ---------------- */}'
+          overlay = """
+                {showHud && deviceMode === "mobile" && hud.status === "playing" && (
+                  <>
+                    <div className="pointer-events-auto absolute bottom-7 left-5 z-30 flex h-36 w-36 touch-none items-center justify-center rounded-full border-2 border-white/40 bg-black/40 shadow-xl"
+                      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); moveStick(e); }}
+                      onPointerMove={(e) => { if (e.buttons || e.pressure > 0) moveStick(e); }}
+                      onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
+                      <div className="pointer-events-none absolute h-24 w-24 rounded-full border border-white/25" />
+                      <div data-stick-knob className="pointer-events-none absolute h-14 w-14 rounded-full border-2 border-cyan-200 bg-cyan-400/50 shadow-lg" />
+                    </div>
+                    <div className="pointer-events-auto absolute inset-y-0 right-0 z-10 w-1/2 touch-none"
+                      onPointerDown={(e) => { cameraTouchRef.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); }}
+                      onPointerMove={(e) => {
+                        const prev = cameraTouchRef.current;
+                        if (!prev) return;
+                        const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+                        cameraTouchRef.current = { x: e.clientX, y: e.clientY };
+                        window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, movementX: dx, movementY: dy }));
+                      }}
+                      onPointerUp={() => { cameraTouchRef.current = null; }}
+                      onPointerCancel={() => { cameraTouchRef.current = null; }}
+                    />
+                    <div className="pointer-events-none absolute bottom-3 right-4 z-30 text-[10px] font-bold text-white/60">ลากฝั่งขวาเพื่อหมุนกล้อง</div>
+                  </>
+                )}
+          """
+          if mobile_anchor in s and "data-stick-knob" not in s:
+              s = s.replace(mobile_anchor, overlay + "\\n      " + mobile_anchor)
           p.write_text(s)
 
           # Correct remaining armor labels while preserving the original game model.
