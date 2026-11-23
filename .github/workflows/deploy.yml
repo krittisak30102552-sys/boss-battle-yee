@@ -230,7 +230,7 @@ jobs:
           };
           """
           if helper_anchor in s and "const cameraTouchRef" not in s:
-              s = s.replace(helper_anchor, helpers + "\\n  " + helper_anchor)
+              s = s.replace(helper_anchor, helpers + "\n  " + helper_anchor)
           mobile_anchor = '      {/* ---------------- MENU ---------------- */}'
           overlay = """
                 {showHud && deviceMode === "mobile" && hud.status === "playing" && (
@@ -259,7 +259,7 @@ jobs:
                 )}
           """
           if mobile_anchor in s and "data-stick-knob" not in s:
-              s = s.replace(mobile_anchor, overlay + "\\n      " + mobile_anchor)
+              s = s.replace(mobile_anchor, overlay + "\n      " + mobile_anchor)
           p.write_text(s)
 
           # Correct remaining armor labels while preserving the original game model.
