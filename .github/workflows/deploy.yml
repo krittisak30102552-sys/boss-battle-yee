@@ -621,6 +621,13 @@ jobs:
                     </div>
                   </div>
                 )}
+                {showHud && deviceMode === "desktop" && hud.status === "playing" && (
+                  <button type="button"
+                    onClick={() => { const active = gameRef.current?.toggleSuit() ?? false; setTonyMode(active); }}
+                    className={tonyMode ? "absolute right-6 top-24 z-40 rounded-xl border border-amber-300 bg-amber-500/25 px-4 py-3 text-sm font-black text-amber-100 shadow-xl" : "absolute right-6 top-24 z-40 rounded-xl border border-white/40 bg-black/80 px-4 py-3 text-sm font-black text-white shadow-xl"}>
+                    {tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
+                  </button>
+                )}
           """
           menu_anchor = 'MENU ---------------- */}'
           if menu_anchor in s and "ถอดชุด · โทนี่กะต๊าก" not in s:
