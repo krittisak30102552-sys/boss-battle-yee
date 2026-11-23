@@ -656,10 +656,10 @@ jobs:
               s = s.replace(anchor, anchor + '\nimport { SuitSystem } from "./suit";')
 
           if "private suit: SuitSystem;" not in s:
-              anchor = "  private nano: NanoSystem;"
+              anchor = "  private buildWorld() {"
               if anchor not in s:
-                  raise SystemExit("NanoSystem field anchor missing")
-              s = s.replace(anchor, anchor + "\n  private suit: SuitSystem;")
+                  raise SystemExit("Game class field insertion anchor missing")
+              s = s.replace(anchor, "  private suit: SuitSystem;\n\n" + anchor)
 
           init = """
               this.suit = new SuitSystem({
