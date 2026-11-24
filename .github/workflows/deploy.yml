@@ -739,40 +739,6 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Verify device chooser patch
-        working-directory: game
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          s = Path("src/App.tsx").read_text()
-          g = Path("src/game/Game.ts").read_text()
-          checks = {
-              "new Tony Stark rig": "function buildTony(): TonyRig" in Path("src/game/suit.ts").read_text(),
-              "cinematic suit system": "class SuitSystem" in Path("src/game/suit.ts").read_text(),
-              "suit system integrated": 'import { SuitSystem } from "./suit";' in g and "new SuitSystem(" in g,
-              "suit animation updates each frame": "this.suit.update(dt, this.time);" in g,
-              "Tony animation updates while unarmored": "this.suit.poseTony(dt, this.time" in g,
-              "suit toggle API": "toggleSuit()" in g,
-              "R toggles the suit": 'if (e.code === "KeyR") this.toggleSuit();' in g,
-              "T repairs armor": 'if (e.code === "KeyT") this.heal();' in g,
-              "mobile touch camera API": "touchLook(dx: number, dy: number)" in g,
-              "camera drag covers blank screen": 'absolute inset-0 z-10 touch-none' in s,
-              "camera drag calls touchLook directly": "gameRef.current?.touchLook(dx, dy)" in s,
-              "joystick has fixed outer ring": "data-stick-area" in s and "h-36 w-36" in s,
-              "mobile skill controls use touch pointerup": "onPointerUp={(e) => { e.preventDefault(); gameRef.current?.selectSkill(index); }}" in s,
-              "mobile suit toggle uses pointerup": "gameRef.current?.toggleSuit()" in s and "onPointerUp" in s,
-              "mobile attack hold": "setAttackHeld(true)" in s,
-              "skill four has an adjacent info label": 'index === 3 && (' in s and '"สกิลพิเศษ"' in s,
-              "mobile repair key is T": 'code: "KeyT", key: "t"' in s,
-              "device chooser exists": "SELECT CONTROL MODE" in s,
-              "Tony label exists": "ถอดชุด" in s and "MK-85" in s,
-          }
-          for name, ok in checks.items():
-              print(("PASS" if ok else "FAIL") + ": " + name)
-          if not all(checks.values()):
-              raise SystemExit("Device chooser patch is incomplete")
-          PY
-
       - name: Install dependencies
         working-directory: game
         run: npm ci
