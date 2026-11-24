@@ -788,10 +788,10 @@ jobs:
           p = Path("game/src/game/Game.ts")
           s = p.read_text()
           if "private wingsManual = false;" not in s:
-              anchor = "  private snapCount = 0;"
+              anchor = "  private buildWorld() {"
               if anchor not in s:
                   raise SystemExit("Wing state insertion anchor missing")
-              s = s.replace(anchor, anchor + "\\n  private wingsManual = false;", 1)
+              s = s.replace(anchor, "  private wingsManual = false;\\n\\n" + anchor, 1)
 
           if "toggleWings()" not in s:
               anchor = "  private updateWings(dt: number) {"
