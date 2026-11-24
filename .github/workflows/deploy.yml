@@ -728,11 +728,6 @@ jobs:
                       กาง/พับปีกนาโน [V]
                     </button>"""
           s = s.replace(desktop_suit, desktop_wing, 1)
-          menu_anchor = 'MENU ---------------- */}'
-          if menu_anchor in s and "ถอดชุด · โทนี่กะต๊าก" not in s:
-              idx = s.index(menu_anchor)
-              line_start = s.rfind(chr(10), 0, idx) + 1
-              s = s[:line_start] + action_pad + chr(10) + s[line_start:]
           p.write_text(s)
           PY
 
