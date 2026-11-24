@@ -1077,15 +1077,15 @@ jobs:
           n = n.replace(old_group, old_group.replace('id === 2 ? "C"', 'id === 2 ? "BACK"'), 1)
 
           chest_parent = '''      case "C":
-                return r.mountC;'''
+        return r.mountC;'''
           if chest_parent not in n:
               raise SystemExit("Nano back-mount insertion anchor missing")
           n = n.replace(
               chest_parent,
               '''      case "C":
-                return r.mountC;
-              case "BACK":
-                return r.mountBack;''',
+        return r.mountC;
+      case "BACK":
+        return r.mountBack;''',
               1,
           )
 
