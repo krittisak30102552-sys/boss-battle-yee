@@ -882,6 +882,116 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Unify controls and add in-game settings
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("game/src/game/Game.ts")
+          g = p.read_text()
+          old = 'if (e.code === "KeyV") this.toggleWings();'
+          new = '''if (e.code === "KeyV") {
+                this.setCombatMode(this.combatMode === 0 ? 1 : 0);
+                this.selectSkill(this.combatMode === 0 ? 0 : 6);
+              }
+              if (e.code === "KeyB") this.toggleWings();'''
+          if old in g:
+              g = g.replace(old, new, 1)
+          elif 'if (e.code === "KeyV") {' not in g:
+              raise SystemExit("V key binding not found")
+          # Keep the mode indicator in sync when V is pressed.
+          g = g.replace(
+              '                return this.combatMode;\n              }',
+              '                window.dispatchEvent(new CustomEvent("combatmodechange", { detail: this.combatMode }));\n                return this.combatMode;\n              }',
+              1
+          )
+          p.write_text(g)
+
+          p = Path("game/src/App.tsx")
+          s = p.read_text()
+          # Start directly in desktop controls; device choice now lives in settings.
+          s = s.replace('onClick={() => setChooseMode(true)}',
+                        'onClick={() => { setChooseMode(false); setDeviceMode("desktop"); gameRef.current?.start(); }}')
+          s = s.replace('const [tonyMode, setTonyMode] = useState(false);',
+                        'const [tonyMode, setTonyMode] = useState(false);\n  const [settingsOpen, setSettingsOpen] = useState(false);', 1)
+          # React state follows keyboard mode changes as well as on-screen mode buttons.
+          if 'combatmodechange' not in s:
+              anchor = '  const bossPct = hud.bossHp / hud.bossMax;'
+              listener = '''
+          useEffect(() => {
+            const onCombatModeChange = (event: Event) => {
+              const detail = (event as CustomEvent<number>).detail;
+              setCombatMode(detail === 1 ? 1 : 0);
+            };
+            window.addEventListener("combatmodechange", onCombatModeChange);
+            return () => window.removeEventListener("combatmodechange", onCombatModeChange);
+          }, []);
+          '''
+              if anchor not in s: raise SystemExit("App effect insertion anchor missing")
+              s = s.replace(anchor, listener + "\n  " + anchor, 1)
+
+          # One settings panel is shared by desktop and touch play.
+          settings_ui = '''
+                {showHud && hud.status === "playing" && (
+                  <>
+                    <button type="button" onClick={() => setSettingsOpen((v) => !v)}
+                      className="pointer-events-auto absolute right-4 top-4 z-[80] rounded-xl border border-white/35 bg-slate-950/90 px-3 py-2 text-xs font-black text-white shadow-xl">
+                      ⚙ ตั้งค่า
+                    </button>
+                    {settingsOpen && (
+                      <div className="pointer-events-auto absolute right-4 top-16 z-[90] w-64 rounded-2xl border border-cyan-300/40 bg-slate-950/95 p-4 text-white shadow-2xl">
+                        <div className="mb-3 text-sm font-black text-cyan-200">ตั้งค่าการควบคุม</div>
+                        <button type="button"
+                          onClick={() => { setDeviceMode((v) => v === "mobile" ? "desktop" : "mobile"); setSettingsOpen(false); }}
+                          className="mb-3 w-full rounded-lg border border-cyan-300/50 bg-cyan-500/15 px-3 py-2 text-left text-xs font-bold">
+                          {deviceMode === "mobile" ? "เปลี่ยนเป็นคอมพิวเตอร์" : "เปิดโหมดมือถือ · ปุ่มสัมผัส"}
+                        </button>
+                        <div className="space-y-1 text-[11px] leading-relaxed text-white/75">
+                          <div>V — เปลี่ยนโหมดต่อสู้</div>
+                          <div>R — ถอดชุด / ใส่ชุด Mark 85</div>
+                          <div>B — กาง / พับปีกนาโน</div>
+                          <div>1–9, 0 — เลือกสกิล</div>
+                          <div>คลิก / แตะโจมตี — ยิงอาวุธที่เลือก</div>
+                        </div>
+                        <button type="button" onClick={() => setSettingsOpen(false)}
+                          className="mt-3 w-full rounded-lg bg-white/10 px-3 py-2 text-xs font-bold">ปิด</button>
+                      </div>
+                    )}
+                  </>
+                )}
+          '''
+          menu_anchor = 'MENU ---------------- */}'
+          if menu_anchor not in s: raise SystemExit("Menu insertion anchor missing")
+          if '⚙ ตั้งค่า' not in s:
+              idx = s.index(menu_anchor)
+              line_start = s.rfind(chr(10), 0, idx) + 1
+              s = s[:line_start] + settings_ui + chr(10) + s[line_start:]
+
+          # Consistent three-column skill layout and active-loadout filtering on touch UI.
+          s = s.replace('max-w-[52vw] flex-col items-end gap-2 touch-none',
+                        'w-[min(72vw,520px)] max-w-[72vw] flex-col items-end gap-1 touch-none')
+          s = s.replace('<div className="grid grid-cols-2 gap-1.5">\n                        {WEAPON_INFO.map((w, index) => (',
+                        '<div className="grid w-full grid-cols-3 gap-1">\n                        {WEAPON_INFO.map((w, index) => (')
+          s = s.replace('''                        {WEAPON_INFO.map((w, index) => (
+                          <div key={w.key}''',
+                        '''                        {WEAPON_INFO.map((w, index) => {
+                          if (combatMode === 0 ? index >= 6 : index < 6) return null;
+                          return (<div key={w.key}''', 1)
+          s = s.replace('''                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">''',
+                        '''                          </div>);
+                        })}
+                      </div>
+                      <div className="grid w-full grid-cols-2 gap-1">''', 1)
+          # Smaller touch action buttons to leave more room for the game view.
+          s = s.replace('px-4 py-3 text-sm font-black', 'px-2 py-2 text-xs font-black')
+          s = s.replace('px-3 py-3 text-xs font-black', 'px-2 py-2 text-[10px] font-black')
+          s = s.replace('w-full h-11 text-xs', 'w-full h-9 text-[10px]')
+          p.write_text(s)
+          PY
       - name: Install dependencies
         working-directory: game
         run: npm ci
