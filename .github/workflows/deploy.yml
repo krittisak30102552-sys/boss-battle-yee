@@ -866,6 +866,20 @@ jobs:
           s = s.replace('px-3 py-2.5 text-xs font-black', 'px-2 py-1.5 text-[9px] font-black', 1)
           s = s.replace('"w-full h-11 text-xs"', '"w-full h-8 text-[9px]"')
           p.write_text(s)
+          # Normalize the literal escaped newline accidentally inserted in the desktop map.
+          s = s.replace("{\\n                const skillIndex", "{" + chr(10) + "                const skillIndex")
+          s = s.replace("const active = hud.weapon === i;" + chr(10) + "                const ult = i === 10;", "const active = hud.weapon === skillIndex;" + chr(10) + "                const ult = skillIndex === 10;")
+          # Rebuild the mobile map with original skill indices and filter by active loadout.
+          mobile_open = '<div className="grid grid-cols-4 gap-1">' + chr(10) + '              {WEAPON_INFO.map((w, index) => ('
+          mobile_new = '<div className="grid w-full grid-cols-3 gap-1">' + chr(10) + '              {WEAPON_INFO.map((w, index) => {' + chr(10) + '                const skillIndex = index;' + chr(10) + '                if (combatMode === 0 ? index >= 6 : index < 6) return null;' + chr(10) + '                return ('
+          if mobile_open in s: s = s.replace(mobile_open, mobile_new, 1)
+          mobile_close = '                </button>' + chr(10) + '              ))}' + chr(10) + '            </div>' + chr(10) + '            <div className="grid grid-cols-2 gap-1.5">'
+          mobile_close_new = '                </button>' + chr(10) + '                );' + chr(10) + '              })}' + chr(10) + '            </div>' + chr(10) + '            <div className="grid w-full grid-cols-2 gap-1">'
+          if mobile_close in s: s = s.replace(mobile_close, mobile_close_new, 1)
+          s = s.replace('hud.weapon === index ? "border-amber-300', 'hud.weapon === skillIndex ? "border-amber-300', 1)
+          s = s.replace('index === 10 && hud.ult >= 100', 'skillIndex === 10 && hud.ult >= 100', 1)
+          s = s.replace('gameRef.current?.selectSkill(index);', 'gameRef.current?.selectSkill(skillIndex);', 1)
+          p.write_text(s)
           PY
 
       - name: Install dependencies
