@@ -714,7 +714,7 @@ jobs:
               s = s.replace(anchor, anchor + '\\n      if (e.code === "KeyV") this.toggleWings();', 1)
           p.write_text(s)
 
-          p = Path("src/App.tsx")
+          p = Path("game/src/App.tsx")
           s = p.read_text()
           # Add a dedicated mobile button beside the suit control.
           anchor = """{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
