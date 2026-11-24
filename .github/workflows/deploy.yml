@@ -730,6 +730,142 @@ jobs:
                     </button>"""
           s = s.replace(desktop_suit, desktop_wing, 1)
           p.write_text(s)
+          # Two selectable combat loadouts + spider defense rig.
+          p = Path("game/src/game/Game.ts")
+          s = p.read_text()
+          if "private combatMode = 0;" not in s:
+              anchor = "  private rig: IronRig;"
+              if anchor not in s: raise SystemExit("Combat mode field anchor missing")
+              s = s.replace(anchor, anchor + "\n  private combatMode = 0;\n  private spiderArms = new THREE.Group();\n  private spiderJoints: THREE.Group[] = [];", 1)
+          if "this.spiderArms.visible = false;" not in s:
+              anchor = "    this.rig = buildIronMan();\n    this.scene.add(this.rig.root);"
+              setup = """
+              this.spiderArms.name = "Spider Defense Appendages";
+              this.spiderArms.visible = false;
+              this.rig.mountBack.add(this.spiderArms);
+              const spiderMetal = new THREE.MeshStandardMaterial({ color: 0x253342, metalness: 0.92, roughness: 0.2, emissive: 0x07334a, emissiveIntensity: 1.1 });
+              const spiderGlow = new THREE.MeshStandardMaterial({ color: 0x35dfff, metalness: 0.65, roughness: 0.18, emissive: 0x12bfff, emissiveIntensity: 2.4 });
+              const addSpiderSegment = (parent: THREE.Group, a: THREE.Vector3, b: THREE.Vector3, radius: number, material: THREE.Material) => {
+                const delta = b.clone().sub(a);
+                const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.72, radius, delta.length(), 9), material);
+                mesh.position.copy(a).add(b).multiplyScalar(0.5);
+                mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+                mesh.castShadow = true;
+                parent.add(mesh);
+              };
+              for (const side of [-1, 1]) {
+                for (let row = 0; row < 3; row++) {
+                  const limb = new THREE.Group();
+                  limb.position.set(side * 0.2, 0.22 - row * 0.2, -0.08);
+                  const elbow = new THREE.Vector3(side * (0.55 + row * 0.08), 0.2 - row * 0.04, -0.2 - row * 0.08);
+                  const tip = new THREE.Vector3(side * (1.05 + row * 0.12), 0.02 - row * 0.1, -0.72 - row * 0.12);
+                  addSpiderSegment(limb, new THREE.Vector3(0, 0, 0), elbow, 0.075, spiderMetal);
+                  addSpiderSegment(limb, elbow, tip, 0.052, spiderGlow);
+                  const joint = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), spiderMetal);
+                  joint.position.copy(elbow);
+                  limb.add(joint);
+                  const tipGlow = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), spiderGlow);
+                  tipGlow.position.copy(tip);
+                  limb.add(tipGlow);
+                  this.spiderArms.add(limb);
+                  this.spiderJoints.push(limb);
+                }
+              }
+              """
+              if anchor not in s: raise SystemExit("Spider appendage setup anchor missing")
+              s = s.replace(anchor, anchor + setup, 1)
+          if "setCombatMode(mode: number)" not in s:
+              anchor = "  toggleWings() {"
+              method = """  setCombatMode(mode: number) {
+                this.combatMode = mode === 1 ? 1 : 0;
+                this.spiderArms.visible = this.combatMode === 1;
+                const shield = this.nano.weapons[W.SHIELD].glow;
+                if (shield) {
+                  const material = shield.material as THREE.MeshBasicMaterial;
+                  material.color.setHex(this.combatMode === 1 ? 0x38e8ff : 0x66dfff);
+                  material.wireframe = this.combatMode === 1;
+                }
+                return this.combatMode;
+              }
+
+              """
+              if anchor not in s: raise SystemExit("Combat mode method anchor missing")
+              s = s.replace(anchor, method + anchor, 1)
+          if "this.spiderJoints.forEach((limb, i)" not in s:
+              anchor = "    const d = p.wing;"
+              anim = """    this.spiderJoints.forEach((limb, i) => {
+                  const side = i < 3 ? -1 : 1;
+                  const row = i % 3;
+                  const spread = this.combatMode === 1 ? 1 : 0;
+                  limb.rotation.y = side * (0.12 + spread * 0.34 + Math.sin(this.time * 2.2 + i) * 0.035);
+                  limb.rotation.x = -0.08 - spread * (0.12 + row * 0.035) + Math.sin(this.time * 1.7 + i * 0.7) * 0.025;
+                });
+              """
+              if anchor not in s: raise SystemExit("Spider animation anchor missing")
+              s = s.replace(anchor, anchor + "\n" + anim, 1)
+          old = '    if (sh.glow) (sh.glow.material as THREE.MeshBasicMaterial).opacity = p.blocking ? 0.5 + Math.sin(this.time * 18) * 0.12 : 0.1;'
+          new = """    if (sh.glow) {
+                const shieldMat = sh.glow.material as THREE.MeshBasicMaterial;
+                shieldMat.opacity = p.blocking ? (this.combatMode === 1 ? 0.62 + Math.sin(this.time * 24) * 0.12 : 0.5 + Math.sin(this.time * 18) * 0.12) : 0.08;
+                shieldMat.color.setHex(this.combatMode === 1 ? 0x38e8ff : 0x66dfff);
+                shieldMat.wireframe = this.combatMode === 1;
+              }"""
+          if old in s: s = s.replace(old, new, 1)
+          elif "shieldMat.wireframe = this.combatMode === 1;" not in s: raise SystemExit("Hologram shield update anchor missing")
+          p.write_text(s)
+
+          p = Path("game/src/App.tsx")
+          s = p.read_text()
+          if "const [combatMode, setCombatMode]" not in s:
+              anchor = '  const [tonyMode, setTonyMode] = useState(false);'
+              extra = '''
+              const [combatMode, setCombatMode] = useState<0 | 1>(0);
+              const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
+              const switchCombatMode = () => {
+                const next = combatMode === 0 ? 1 : 0;
+                setCombatMode(next);
+                gameRef.current?.setCombatMode(next);
+                gameRef.current?.selectSkill(next === 0 ? 0 : 6);
+              };
+              '''
+              if anchor not in s: raise SystemExit("App combat state anchor missing")
+              s = s.replace(anchor, anchor + extra, 1)
+          # Desktop weapon strip: show only the active loadout.
+          s = s.replace('WEAPON_INFO.map((w, i) => {', 'visibleWeapons.map((w, i) => {\\n                const skillIndex = combatMode === 0 ? i : i + 6;', 1)
+          s = s.replace('const active = hud.weapon === i;\\n                const ult = i === 10;', 'const active = hud.weapon === skillIndex;\\n                const ult = skillIndex === 10;', 1)
+          s = s.replace('(i === 3 || i === 10)', '(skillIndex === 3 || skillIndex === 10)', 1)
+          # Add a compact mode selector to desktop strip.
+          desktopAnchor = '''            <div className="mb-2 text-center text-[11px] font-bold text-amber-200 drop-shadow">'''
+          desktopMode = '''            <div className="mb-2 flex justify-center gap-2">
+                  <button type="button" onClick={() => { setCombatMode(0); gameRef.current?.setCombatMode(0); gameRef.current?.selectSkill(0); }} className={combatMode === 0 ? "rounded-md border border-amber-300 bg-amber-500/25 px-3 py-1 text-xs font-black text-amber-100" : "rounded-md border border-white/20 bg-black/60 px-3 py-1 text-xs text-white/70"}>MODE 1 · MARK 85</button>
+                  <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }} className={combatMode === 1 ? "rounded-md border border-cyan-300 bg-cyan-500/25 px-3 py-1 text-xs font-black text-cyan-100" : "rounded-md border border-white/20 bg-black/60 px-3 py-1 text-xs text-white/70"}>MODE 2 · SPIDER DEFENSE</button>
+                </div>
+              '''
+          if desktopAnchor in s and "MODE 2 · SPIDER DEFENSE" not in s: s = s.replace(desktopAnchor, desktopMode + desktopAnchor, 1)
+          # Mobile skills: compact 3-column grid and loadout selector.
+          s = s.replace('max-w-[56vw] flex-col items-end gap-1.5', 'w-[min(72vw,520px)] max-w-[72vw] flex-col items-end gap-1')
+          s = s.replace('''            <div className="rounded-md border border-amber-300/40 bg-slate-950/85 px-2 py-1 text-[10px] font-bold leading-tight text-amber-200">''', '''            <div className="flex w-full gap-1">
+                  <button type="button" onClick={() => { setCombatMode(0); gameRef.current?.setCombatMode(0); gameRef.current?.selectSkill(0); }} className={combatMode === 0 ? "flex-1 rounded border border-amber-300 bg-amber-500/25 px-1 py-1 text-[9px] font-black text-amber-100" : "flex-1 rounded border border-white/20 bg-black/75 px-1 py-1 text-[9px] text-white/70"}>MODE 1 · MK85</button>
+                  <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }} className={combatMode === 1 ? "flex-1 rounded border border-cyan-300 bg-cyan-500/25 px-1 py-1 text-[9px] font-black text-cyan-100" : "flex-1 rounded border border-white/20 bg-black/75 px-1 py-1 text-[9px] text-white/70"}>MODE 2 · SPIDER</button>
+                </div>
+            <div className="w-full rounded-md border border-amber-300/40 bg-slate-950/85 px-2 py-1 text-[9px] font-bold leading-tight text-amber-200">''', 1)
+          s = s.replace('<div className="grid grid-cols-4 gap-1">\\n              {WEAPON_INFO.map((w, index) => (', '<div className="grid w-full grid-cols-3 gap-1">\\n              {visibleWeapons.map((w, index) => {\\n                const skillIndex = combatMode === 0 ? index : index + 6;\\n                return (', 1)
+          s = s.replace('gameRef.current?.selectSkill(index);', 'gameRef.current?.selectSkill(skillIndex);', 1)
+          s = s.replace('hud.weapon === index ? "border-amber-300', 'hud.weapon === skillIndex ? "border-amber-300', 1)
+          s = s.replace('index === 10 && hud.ult >= 100', 'skillIndex === 10 && hud.ult >= 100', 1)
+          s = s.replace('''                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">''', '''                </button>
+                );
+              })}
+            </div>
+            <div className="grid w-full grid-cols-2 gap-1">''', 1)
+          s = s.replace('px-1 py-1.5 text-[9px]', 'px-1 py-1 text-[8px]', 1)
+          s = s.replace('px-4 py-2.5 text-sm font-black', 'px-2 py-1.5 text-[10px] font-black', 1)
+          s = s.replace('px-3 py-2.5 text-xs font-black', 'px-2 py-1.5 text-[9px] font-black', 1)
+          s = s.replace('"w-full h-11 text-xs"', '"w-full h-8 text-[9px]"')
+          p.write_text(s)
           PY
 
       - name: Install dependencies
