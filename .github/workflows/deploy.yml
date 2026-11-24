@@ -882,6 +882,105 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Add visible combat mode controls and wing-mounted Uni-Beam emitters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # V is the combat-mode toggle; B remains the manual wing toggle.
+          p = Path("game/src/game/Game.ts")
+          s = p.read_text()
+          s = s.replace('if (e.code === "KeyV") this.toggleWings();', 'if (e.code === "KeyB") this.toggleWings();')
+          if 'if (e.code === "KeyV") this.setCombatMode(this.combatMode === 0 ? 1 : 0);' not in s:
+              anchor = '      if (e.code === "KeyB") this.toggleWings();'
+              if anchor not in s:
+                  raise SystemExit("Expected wing keyboard binding not found")
+              s = s.replace(anchor, anchor + '\n      if (e.code === "KeyV") this.setCombatMode(this.combatMode === 0 ? 1 : 0);', 1)
+          p.write_text(s)
+
+          # Move Uni-Beam secondary emitters from the feet to the back/shoulder wing mounts.
+          p = Path("game/src/game/nano.ts")
+          s = p.read_text()
+          old = '''    /* ---- UNI-BEAM (chest lens) + FOOT UNI-BEAMS ---- */
+              nanoGeo(g, u, new THREE.TorusGeometry(0.19, 0.04, 8, 24), GOLD, 0, 0, 0.03);
+              nanoGeo(g, u, new THREE.TorusGeometry(0.12, 0.03, 8, 20), CYAN, 0, 0, 0.07, EMI);
+              nanoGeo(g, u, new THREE.SphereGeometry(0.08, 12, 10), 0xffffff, 0, 0, 0.06, { emissive: 0xffffff, ei: 4, metal: 0, sz: 0.5 });
+              for (let i = 0; i < 3; i++) {
+                const a = Math.PI / 2 + (i / 3) * Math.PI * 2;
+                nanoBox(g, u, 0.045, 0.045, 0.24, RED, Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0.13);
+              }
+              muzzle.position.set(0, 0, 0.3);
+              for (const key of ["FR", "FL"] as const) {
+                const f = newGroup(key);
+                nanoGeo(f, u, new THREE.TorusGeometry(0.13, 0.035, 8, 20), GOLD, 0, -0.02, 0, { rx: Math.PI / 2 });
+                nanoGeo(f, u, new THREE.CylinderGeometry(0.07, 0.1, 0.09, 12), RED, 0, -0.05, 0);
+                nanoGeo(f, u, new THREE.CylinderGeometry(0.06, 0.06, 0.03, 12), CYAN, 0, -0.1, 0, EMI);
+                const m = new THREE.Object3D();
+                m.position.set(0, -0.1, 0);
+                f.add(m);
+                extraMuzzles.push(m);
+              }'''
+          new = '''    /* ---- UNI-BEAM: chest lens + paired BACK-WING emitters (no foot beams) ---- */
+              nanoGeo(g, u, new THREE.TorusGeometry(0.19, 0.04, 8, 24), GOLD, 0, 0, 0.03);
+              nanoGeo(g, u, new THREE.TorusGeometry(0.12, 0.03, 8, 20), CYAN, 0, 0, 0.07, EMI);
+              nanoGeo(g, u, new THREE.SphereGeometry(0.08, 12, 10), 0xffffff, 0, 0, 0.06, { emissive: 0xffffff, ei: 4, metal: 0, sz: 0.5 });
+              for (let i = 0; i < 3; i++) {
+                const a = Math.PI / 2 + (i / 3) * Math.PI * 2;
+                nanoBox(g, u, 0.045, 0.045, 0.24, RED, Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0.13);
+              }
+              muzzle.position.set(0, 0, 0.3);
+              for (const key of ["SR", "SL"] as const) {
+                const wing = newGroup(key);
+                const side = key === "SR" ? 1 : -1;
+                nanoGeo(wing, u, new THREE.TorusGeometry(0.15, 0.035, 8, 20), GOLD, side * 0.04, 0, 0, { rx: Math.PI / 2 });
+                nanoGeo(wing, u, new THREE.CylinderGeometry(0.075, 0.11, 0.16, 12), RED, side * 0.04, 0, 0.04, { rx: Math.PI / 2 });
+                nanoGeo(wing, u, new THREE.CylinderGeometry(0.065, 0.065, 0.035, 12), CYAN, side * 0.04, 0, 0.13, { rx: Math.PI / 2, ...EMI });
+                const emitter = new THREE.Object3D();
+                emitter.position.set(side * 0.04, 0, 0.19);
+                wing.add(emitter);
+                extraMuzzles.push(emitter);
+              }'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif "paired BACK-WING emitters (no foot beams)" not in s:
+              raise SystemExit("Uni-Beam foot emitter block did not match source")
+          p.write_text(s)
+
+          # Add a dedicated always-visible mode switch to both desktop and touch HUDs.
+          p = Path("game/src/App.tsx")
+          s = p.read_text()
+          desktop_anchor = '''      {showHud && deviceMode === "desktop" && hud.status === "playing" && (
+        <button type="button"'''
+          desktop_ui = '''      {showHud && deviceMode === "desktop" && hud.status === "playing" && (
+        <div className="absolute left-1/2 top-4 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-xl border border-cyan-300/50 bg-slate-950/90 p-2 shadow-[0_0_24px_rgba(34,211,238,0.18)]">
+          <span className="hidden sm:block px-2 text-[10px] font-black tracking-widest text-cyan-200">COMBAT MODE</span>
+          <button type="button" onClick={() => { setCombatMode(0); gameRef.current?.setCombatMode(0); gameRef.current?.selectSkill(0); }}
+            className={combatMode === 0 ? "rounded-lg border border-amber-300 bg-amber-500/25 px-3 py-2 text-xs font-black text-amber-100" : "rounded-lg border border-white/20 bg-black/60 px-3 py-2 text-xs text-white/70"}>1 · MARK 85</button>
+          <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }}
+            className={combatMode === 1 ? "rounded-lg border border-cyan-300 bg-cyan-500/25 px-3 py-2 text-xs font-black text-cyan-100" : "rounded-lg border border-white/20 bg-black/60 px-3 py-2 text-xs text-white/70"}>2 · SPIDER</button>
+          <span className="rounded-md bg-cyan-950 px-2 py-1 text-[10px] font-black text-cyan-200">กด V</span>
+        </div>
+      )}
+      {showHud && deviceMode === "desktop" && hud.status === "playing" && (
+        <button type="button"'''
+          if desktop_anchor in s and "COMBAT MODE</span>" not in s:
+              s = s.replace(desktop_anchor, desktop_ui, 1)
+          mobile_anchor = '''      {showHud && deviceMode === "mobile" && hud.status === "playing" && (
+        <div className="pointer-events-none absolute inset-0 z-40">'''
+          mobile_ui = '''      {showHud && deviceMode === "mobile" && hud.status === "playing" && (
+        <div className="pointer-events-none absolute inset-0 z-50">
+          <div className="pointer-events-auto absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-cyan-300/60 bg-slate-950/95 p-1.5 shadow-lg">
+            <button type="button" onClick={() => { setCombatMode(0); gameRef.current?.setCombatMode(0); gameRef.current?.selectSkill(0); }}
+              className={combatMode === 0 ? "rounded-md border border-amber-300 bg-amber-500/25 px-3 py-2 text-[10px] font-black text-amber-100" : "rounded-md border border-white/20 px-3 py-2 text-[10px] text-white/70"}>MODE 1</button>
+            <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }}
+              className={combatMode === 1 ? "rounded-md border border-cyan-300 bg-cyan-500/25 px-3 py-2 text-[10px] font-black text-cyan-100" : "rounded-md border border-white/20 px-3 py-2 text-[10px] text-white/70"}>MODE 2</button>
+          </div>'''
+          if mobile_anchor in s and "absolute left-1/2 top-3 flex" not in s:
+              s = s.replace(mobile_anchor, mobile_ui, 1)
+          # Keep the original mobile HUD's inner container below the mode bar.
+          p.write_text(s)
+          PY
+
       - name: Install dependencies
         working-directory: game
         run: npm ci
