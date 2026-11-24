@@ -1018,10 +1018,17 @@ jobs:
           s = s[:weapons_start] + shared_skills + s[weapons_end:]
 
           # Replace the mobile-only duplicate skill list with touch actions only.
-          mobile_panel = re.compile(
-              r'      \{showHud && deviceMode === "mobile" && hud\.status === "playing" && \(\n        <div className="pointer-events-none absolute inset-0 z-40">.*?\n      \)\}\n',
-              re.S
-          )
+          mobile_panel_marker = 'pointer-events-none absolute inset-0 z-40'
+          mobile_panel_at = s.find(mobile_panel_marker)
+          mobile_count = 0
+          if mobile_panel_at >= 0:
+              mobile_open_at = s.rfind('{showHud && deviceMode === "mobile"', 0, mobile_panel_at)
+              mobile_close_at = s.find('\n      )}', mobile_panel_at)
+              if mobile_open_at >= 0 and mobile_close_at >= 0:
+                  mobile_line_start = s.rfind(chr(10), 0, mobile_open_at) + 1
+                  mobile_line_end = mobile_close_at + len('\n      )}')
+                  s = s[:mobile_line_start] + mobile_actions.rstrip() + s[mobile_line_end:]
+                  mobile_count = 1
           mobile_actions = """
           {showHud && deviceMode === "mobile" && hud.status === "playing" && (
             <div className="pointer-events-none absolute inset-0 z-40">
@@ -1044,9 +1051,8 @@ jobs:
             </div>
           )}
           """
-          s, mobile_count = mobile_panel.subn(mobile_actions, s, count=1)
           if mobile_count == 0:
-              raise SystemExit("Could not find the old mobile skills/action panel.")
+              raise SystemExit("Could not locate the mobile action panel by its HUD container.")
 
           # Remove desktop-only suit/wing buttons; R and B are shown as keyboard shortcuts.
           s = re.sub(
