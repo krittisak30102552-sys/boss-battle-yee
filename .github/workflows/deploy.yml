@@ -1046,7 +1046,7 @@ jobs:
           # Remove the old Uni-Beam foot emitters and route the single beam from its weapon muzzle.
           g = g.replace("  private footBeams: THREE.Mesh[] = [];\n", "")
           g = re.sub(r'^\s*this\.footBeams = \[mkBeam\(.*\n', "", g, count=1, flags=re.M)
-          g = g.replace("      for (const fb of this.footBeams) fb.visible = false;\n", "")
+          g = re.sub(r'^\s*for \(const fb of this\.footBeams\) fb\.visible = false;\s*\n', "", g, flags=re.M)
           g, foot_loop_count = re.subn(
               r'\n\s*this\.footBeams\.forEach\(\(fb, i\) => \{.*?\n\s*\}\);',
               "",
