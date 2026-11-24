@@ -716,26 +716,28 @@ jobs:
 
           p = Path("game/src/App.tsx")
           s = p.read_text()
-          # Add a dedicated mobile button beside the suit control.
-          anchor = """{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
-                      </button>"""
-          if "กาง/พับปีกนาโน" not in s:
-              if anchor not in s:
-                  raise SystemExit("Mobile suit button anchor missing")
-              s = s.replace(anchor, anchor + """
+          # Add wing buttons inside the existing valid mobile/desktop action JSX.
+          mobile_suit = '''{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
+                      </button>'''
+          mobile_wing = mobile_suit + """
                       <button type="button" onClick={() => gameRef.current?.toggleWings()}
                         className="w-full rounded-xl border border-cyan-300/60 bg-cyan-950/85 px-3 py-3 text-xs font-black text-cyan-100">
                         กาง/พับปีกนาโน [V]
-                      </button>""", 1)
-          # Add a desktop button as well.
-          anchor2 = """{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
-                  </button>"""
-          if anchor2 in s and s.count("กาง/พับปีกนาโน") < 2:
-              s = s.replace(anchor2, anchor2 + """
-                  <button type="button" onClick={() => gameRef.current?.toggleWings()}
-                    className="absolute right-6 top-40 z-40 rounded-xl border border-cyan-300/60 bg-cyan-950/85 px-4 py-3 text-sm font-black text-cyan-100 shadow-xl">
-                    กาง/พับปีกนาโน [V]
-                  </button>""", 1)
+                      </button>"""
+          action_pad = action_pad.replace(mobile_suit, mobile_wing, 1)
+          desktop_suit = '''{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
+                    </button>'''
+          desktop_wing = desktop_suit + """
+                    <button type="button" onClick={() => gameRef.current?.toggleWings()}
+                      className="absolute right-6 top-40 z-40 rounded-xl border border-cyan-300/60 bg-cyan-950/85 px-4 py-3 text-sm font-black text-cyan-100 shadow-xl">
+                      กาง/พับปีกนาโน [V]
+                    </button>"""
+          action_pad = action_pad.replace(desktop_suit, desktop_wing, 1)
+          menu_anchor = 'MENU ---------------- */}'
+          if menu_anchor in s and "ถอดชุด · โทนี่กะต๊าก" not in s:
+              idx = s.index(menu_anchor)
+              line_start = s.rfind(chr(10), 0, idx) + 1
+              s = s[:line_start] + action_pad + chr(10) + s[line_start:]
           p.write_text(s)
           PY
 
