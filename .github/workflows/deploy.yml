@@ -730,7 +730,7 @@ jobs:
                     </button>"""
           s = s.replace(desktop_suit, desktop_wing, 1)
           p.write_text(s)
-          # Two selectable combat loadouts + spider defense rig.
+          # Two selectable combat loadouts using the Mark 85's existing wings.
           p = Path("game/src/game/Game.ts")
           s = p.read_text()
           if "private combatMode = 0;" not in s:
@@ -838,15 +838,15 @@ jobs:
           desktopAnchor = '''            <div className="mb-2 text-center text-[11px] font-bold text-amber-200 drop-shadow">'''
           desktopMode = '''            <div className="mb-2 flex justify-center gap-2">
                   <button type="button" onClick={() => { setCombatMode(0); gameRef.current?.setCombatMode(0); gameRef.current?.selectSkill(0); }} className={combatMode === 0 ? "rounded-md border border-amber-300 bg-amber-500/25 px-3 py-1 text-xs font-black text-amber-100" : "rounded-md border border-white/20 bg-black/60 px-3 py-1 text-xs text-white/70"}>MODE 1 · MARK 85</button>
-                  <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }} className={combatMode === 1 ? "rounded-md border border-cyan-300 bg-cyan-500/25 px-3 py-1 text-xs font-black text-cyan-100" : "rounded-md border border-white/20 bg-black/60 px-3 py-1 text-xs text-white/70"}>MODE 2 · SPIDER DEFENSE</button>
+                  <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }} className={combatMode === 1 ? "rounded-md border border-cyan-300 bg-cyan-500/25 px-3 py-1 text-xs font-black text-cyan-100" : "rounded-md border border-white/20 bg-black/60 px-3 py-1 text-xs text-white/70"}>MODE 2 · WING ASSAULT</button>
                 </div>
               '''
-          if desktopAnchor in s and "MODE 2 · SPIDER DEFENSE" not in s: s = s.replace(desktopAnchor, desktopMode + desktopAnchor, 1)
+          if desktopAnchor in s and "MODE 2 · WING ASSAULT" not in s: s = s.replace(desktopAnchor, desktopMode + desktopAnchor, 1)
           # Mobile skills: compact 3-column grid and loadout selector.
           s = s.replace('max-w-[56vw] flex-col items-end gap-1.5', 'w-[min(72vw,520px)] max-w-[72vw] flex-col items-end gap-1')
           s = s.replace('''            <div className="rounded-md border border-amber-300/40 bg-slate-950/85 px-2 py-1 text-[10px] font-bold leading-tight text-amber-200">''', '''            <div className="flex w-full gap-1">
                   <button type="button" onClick={() => { setCombatMode(0); gameRef.current?.setCombatMode(0); gameRef.current?.selectSkill(0); }} className={combatMode === 0 ? "flex-1 rounded border border-amber-300 bg-amber-500/25 px-1 py-1 text-[9px] font-black text-amber-100" : "flex-1 rounded border border-white/20 bg-black/75 px-1 py-1 text-[9px] text-white/70"}>MODE 1 · MK85</button>
-                  <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }} className={combatMode === 1 ? "flex-1 rounded border border-cyan-300 bg-cyan-500/25 px-1 py-1 text-[9px] font-black text-cyan-100" : "flex-1 rounded border border-white/20 bg-black/75 px-1 py-1 text-[9px] text-white/70"}>MODE 2 · SPIDER</button>
+                  <button type="button" onClick={() => { setCombatMode(1); gameRef.current?.setCombatMode(1); gameRef.current?.selectSkill(6); }} className={combatMode === 1 ? "flex-1 rounded border border-cyan-300 bg-cyan-500/25 px-1 py-1 text-[9px] font-black text-cyan-100" : "flex-1 rounded border border-white/20 bg-black/75 px-1 py-1 text-[9px] text-white/70"}>MODE 2 · FORM 2</button>
                 </div>
             <div className="w-full rounded-md border border-amber-300/40 bg-slate-950/85 px-2 py-1 text-[9px] font-bold leading-tight text-amber-200">''', 1)
           s = s.replace('<div className="grid grid-cols-4 gap-1">\\n              {WEAPON_INFO.map((w, index) => (', '<div className="grid w-full grid-cols-3 gap-1">\\n              {visibleWeapons.map((w, index) => {\\n                const skillIndex = combatMode === 0 ? index : index + 6;\\n                return (', 1)
@@ -991,6 +991,138 @@ jobs:
           s = s.replace('px-3 py-3 text-xs font-black', 'px-2 py-2 text-[10px] font-black')
           s = s.replace('w-full h-11 text-xs', 'w-full h-9 text-[10px]')
           p.write_text(s)
+          PY
+      - name: Use the Mark 85 wings and move Uni-Beam to the back
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          game_path = Path("game/src/game/Game.ts")
+          g = game_path.read_text()
+
+          # Remove the separately-added spider appendages.
+          g = g.replace("  private spiderArms = new THREE.Group();\n", "")
+          g = g.replace("  private spiderJoints: THREE.Group[] = [];\n", "")
+          g, setup_count = re.subn(
+              r'\n\s*this\.spiderArms\.name = "Spider Defense Appendages";.*?this\.spiderJoints\.push\(limb\);\s*\n\s*\}\s*\n\s*\}',
+              "\n",
+              g,
+              count=1,
+              flags=re.S,
+          )
+          g, animation_count = re.subn(
+              r'\n\s*this\.spiderJoints\.forEach\(\(limb, i\) => \{.*?\n\s*\}\);',
+              "",
+              g,
+              count=1,
+              flags=re.S,
+          )
+          if setup_count != 1 or animation_count != 1:
+              raise SystemExit(f"Could not remove spider appendages cleanly: setup={setup_count}, animation={animation_count}")
+
+          # FORM 2 deploys the suit's built-in rear fins instead of spawning extra limbs.
+          spider_toggle = "this.spiderArms.visible = this.combatMode === 1;"
+          if spider_toggle not in g:
+              raise SystemExit("Spider mode toggle anchor missing")
+          g = g.replace(spider_toggle, "this.wingsManual = this.combatMode === 1;", 1)
+
+          # Start a new run in FORM 1 with the original wings folded.
+          reset_anchor = "  private reset() {"
+          reset_pos = g.find(reset_anchor)
+          if reset_pos < 0:
+              raise SystemExit("Game reset method not found")
+          if "this.wingsManual = false;" not in g[reset_pos:reset_pos + 500]:
+              g = g.replace(
+                  reset_anchor,
+                  reset_anchor + """
+              this.combatMode = 0;
+              this.wingsManual = false;
+              window.dispatchEvent(new CustomEvent("combatmodechange", { detail: 0 }));
+          """,
+                  1,
+              )
+
+          # Remove the old Uni-Beam foot emitters and route the single beam from its weapon muzzle.
+          g = g.replace("  private footBeams: THREE.Mesh[] = [];\n", "")
+          g = re.sub(r'^\s*this\.footBeams = \[mkBeam\(.*\n', "", g, count=1, flags=re.M)
+          g = g.replace("      for (const fb of this.footBeams) fb.visible = false;\n", "")
+          g, foot_loop_count = re.subn(
+              r'\n\s*this\.footBeams\.forEach\(\(fb, i\) => \{.*?\n\s*\}\);',
+              "",
+              g,
+              count=1,
+              flags=re.S,
+          )
+          if foot_loop_count != 1 or "footBeams" in g:
+              raise SystemExit("Could not remove all Uni-Beam foot emitters")
+          g = g.replace(
+              'desc: "กดค้างยิงลำแสงจากเตาอาร์คกลางอก — ลอยกลางอากาศจะยิงยูนิบีมที่เท้าเพิ่ม"',
+              'desc: "กดค้างยิงลำแสงยูนิบีมจากชุดปล่อยพลังงานด้านหลัง"',
+              1,
+          )
+          game_path.write_text(g)
+
+          nano_path = Path("game/src/game/nano.ts")
+          n = nano_path.read_text()
+
+          n = n.replace(
+              'export type MountKey = "R" | "L" | "C" | "SR" | "SL" | "FR" | "FL";',
+              'export type MountKey = "R" | "L" | "C" | "BACK" | "SR" | "SL" | "FR" | "FL";',
+              1,
+          )
+          old_group = 'const g = newGroup(id === 9 || id === 10 ? "L" : id === 2 ? "C" : id === 8 ? "SR" : "R");'
+          if old_group not in n:
+              raise SystemExit("Uni-Beam mount selection anchor missing")
+          n = n.replace(old_group, old_group.replace('id === 2 ? "C"', 'id === 2 ? "BACK"'), 1)
+
+          chest_parent = '''      case "C":
+                return r.mountC;'''
+          if chest_parent not in n:
+              raise SystemExit("Nano back-mount insertion anchor missing")
+          n = n.replace(
+              chest_parent,
+              '''      case "C":
+                return r.mountC;
+              case "BACK":
+                return r.mountBack;''',
+              1,
+          )
+
+          uni_start = n.find('  } else if (id === 2) {')
+          uni_end = n.find('  } else if (id === 3) {', uni_start)
+          if uni_start < 0 or uni_end < 0:
+              raise SystemExit("Uni-Beam weapon block not found")
+          uni_block = n[uni_start:uni_end]
+          foot_mount_start = uni_block.find('    for (const key of ["FR", "FL"] as const) {')
+          if foot_mount_start < 0:
+              raise SystemExit("Uni-Beam foot mount block not found")
+          uni_block = uni_block[:foot_mount_start]
+          uni_block = uni_block.replace(
+              "/* ---- UNI-BEAM (chest lens) + FOOT UNI-BEAMS ---- */",
+              "/* ---- UNI-BEAM rear emitter ---- */",
+          )
+          uni_block = uni_block.replace(
+              "muzzle.position.set(0, 0, 0.3);",
+              "muzzle.position.set(0, 0.04, -0.28);",
+              1,
+          )
+          n = n[:uni_start] + uni_block + n[uni_end:]
+          n = n.replace(
+              "additional emitters (zero cannons, foot beams, second pod …)",
+              "additional emitters (zero cannons, secondary pods …)",
+              1,
+          )
+          nano_path.write_text(n)
+
+          # Keep the manual wing button on B; V is now the FORM 1 / FORM 2 switch.
+          app_path = Path("game/src/App.tsx")
+          a = app_path.read_text()
+          a = a.replace("กาง/พับปีกนาโน [V]", "กาง/พับปีกนาโน [B]")
+          a = a.replace("V — เปลี่ยนโหมดต่อสู้", "V — เข้า / ออกจาก FORM 2 (กางปีกอัตโนมัติ)")
+          app_path.write_text(a)
+
+          print("Removed spider appendages; FORM 2 now deploys built-in Mark 85 wings; Uni-Beam now fires from the back.")
           PY
       - name: Install dependencies
         working-directory: game
