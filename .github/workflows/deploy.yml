@@ -671,7 +671,7 @@ jobs:
               anchor = "  private buildWorld() {"
               if anchor not in s:
                   raise SystemExit("Wing state insertion anchor missing")
-              s = s.replace(anchor, "  private wingsManual = false;\\n\\n" + anchor, 1)
+              s = s.replace(anchor, "  private wingsManual = false;\n\n" + anchor, 1)
 
           if "toggleWings()" not in s:
               anchor = "  private updateWings(dt: number) {"
@@ -706,7 +706,7 @@ jobs:
               anchor = '      if (e.code === "KeyR") this.toggleSuit();'
               if anchor not in s:
                   raise SystemExit("Keyboard binding anchor missing")
-              s = s.replace(anchor, anchor + '\\n      if (e.code === "KeyV") this.toggleWings();', 1)
+              s = s.replace(anchor, anchor + '\n      if (e.code === "KeyV") this.toggleWings();', 1)
           p.write_text(s)
 
           p = Path("game/src/App.tsx")
