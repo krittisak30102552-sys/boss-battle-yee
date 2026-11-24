@@ -664,6 +664,7 @@ jobs:
 
           with zipfile.ZipFile("implement-mark-85-combat-skills.zip") as z:
               Path("game/src/game/Game.ts").write_bytes(z.read("src/game/Game.ts"))
+              Path("game/src/game/suit.ts").write_bytes(z.read("src/game/suit.ts"))
 
           p = Path("game/src/game/Game.ts")
           s = p.read_text()
