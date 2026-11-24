@@ -780,6 +780,80 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Add Mark 85 deployable nano wings controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("game/src/game/Game.ts")
+          s = p.read_text()
+          if "private wingsManual = false;" not in s:
+              anchor = "  private snapCount = 0;"
+              if anchor not in s:
+                  raise SystemExit("Wing state insertion anchor missing")
+              s = s.replace(anchor, anchor + "\\n  private wingsManual = false;", 1)
+
+          if "toggleWings()" not in s:
+              anchor = "  private updateWings(dt: number) {"
+              if anchor not in s:
+                  raise SystemExit("Wing animation method missing")
+              method = """  toggleWings() {
+            this.wingsManual = !this.wingsManual;
+            return this.wingsManual;
+          }
+
+          """
+              s = s.replace(anchor, method + anchor, 1)
+
+          old = """    let target = 0.35;
+            if (this.status === "lost") target = 0.1;
+            else if (this.suit.active) target = 0.5;
+            else if (this.nano.current === W.REFOCUS && this.nano.ready) target = p.absorbing ? 1 : 0.8;
+            else if (p.thrusting || p.pos.y > 0.5) target = 0.6;"""
+          new = """    let target = 0.35;
+            if (this.status === "lost") target = 0.1;
+            else if (this.wingsManual) target = 1;
+            else if (this.suit.active) target = 0.5;
+            else if (this.nano.current === W.REFOCUS && this.nano.ready) target = p.absorbing ? 1 : 0.8;
+            else if (this.nano.current === W.UNI && this.nano.ready && p.heat > 0) target = 1;
+            else if (p.thrusting || p.pos.y > 0.5) target = 0.6;"""
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif "this.nano.current === W.UNI && this.nano.ready && p.heat > 0" not in s:
+              raise SystemExit("Wing deployment condition anchor missing")
+
+          if 'if (e.code === "KeyV") this.toggleWings();' not in s:
+              anchor = '      if (e.code === "KeyR") this.toggleSuit();'
+              if anchor not in s:
+                  raise SystemExit("Keyboard binding anchor missing")
+              s = s.replace(anchor, anchor + '\\n      if (e.code === "KeyV") this.toggleWings();', 1)
+          p.write_text(s)
+
+          p = Path("src/App.tsx")
+          s = p.read_text()
+          # Add a dedicated mobile button beside the suit control.
+          anchor = """{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
+                      </button>"""
+          if "กาง/พับปีกนาโน" not in s:
+              if anchor not in s:
+                  raise SystemExit("Mobile suit button anchor missing")
+              s = s.replace(anchor, anchor + """
+                      <button type="button" onClick={() => gameRef.current?.toggleWings()}
+                        className="w-full rounded-xl border border-cyan-300/60 bg-cyan-950/85 px-3 py-3 text-xs font-black text-cyan-100">
+                        กาง/พับปีกนาโน [V]
+                      </button>""", 1)
+          # Add a desktop button as well.
+          anchor2 = """{tonyMode ? "ใส่ชุด MK-85" : "ถอดชุด · โทนี่กะต๊าก"}
+                  </button>"""
+          if anchor2 in s and s.count("กาง/พับปีกนาโน") < 2:
+              s = s.replace(anchor2, anchor2 + """
+                  <button type="button" onClick={() => gameRef.current?.toggleWings()}
+                    className="absolute right-6 top-40 z-40 rounded-xl border border-cyan-300/60 bg-cyan-950/85 px-4 py-3 text-sm font-black text-cyan-100 shadow-xl">
+                    กาง/พับปีกนาโน [V]
+                  </button>""", 1)
+          p.write_text(s)
+          PY
+
       - name: Verify device chooser patch
         working-directory: game
         run: |
