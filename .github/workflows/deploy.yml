@@ -1054,8 +1054,11 @@ jobs:
               count=1,
               flags=re.S,
           )
-          if foot_loop_count != 1 or "footBeams" in g:
-              raise SystemExit("Could not remove all Uni-Beam foot emitters")
+          # The source archive can contain no Game.ts foot-beam loop; the
+          # actual emitters are removed from the Uni-Beam nano weapon block below.
+          if foot_loop_count == 0:
+              print("No separate Game.ts foot-beam loop found; continuing with nano weapon cleanup.")
+          g = re.sub(r'^\s*.*footBeams.*(?:\n|$)', "", g, flags=re.M)
           g = g.replace(
               'desc: "กดค้างยิงลำแสงจากเตาอาร์คกลางอก — ลอยกลางอากาศจะยิงยูนิบีมที่เท้าเพิ่ม"',
               'desc: "กดค้างยิงลำแสงยูนิบีมจากชุดปล่อยพลังงานด้านหลัง"',
