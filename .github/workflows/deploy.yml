@@ -665,6 +665,10 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import zipfile
+
+          with zipfile.ZipFile("implement-mark-85-combat-skills.zip") as z:
+              Path("game/src/game/Game.ts").write_bytes(z.read("src/game/Game.ts"))
 
           p = Path("game/src/game/Game.ts")
           s = p.read_text()
