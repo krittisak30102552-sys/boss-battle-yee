@@ -56,10 +56,13 @@ jobs:
           mkdir -p /tmp/mark85-models
           unzip -p implement-mark-85-combat-skills.zip src/game/builders.ts > /tmp/mark85-models/builders.ts
           unzip -p implement-mark-85-combat-skills.zip src/game/nano.ts > /tmp/mark85-models/nano.ts
+          unzip -p implement-mark-85-combat-skills.zip src/game/Game.ts > /tmp/mark85-models/Game.ts
           test -s /tmp/mark85-models/builders.ts
           test -s /tmp/mark85-models/nano.ts
+          test -s /tmp/mark85-models/Game.ts
           cp /tmp/mark85-models/builders.ts game/src/game/builders.ts
           cp /tmp/mark85-models/nano.ts game/src/game/nano.ts
+          cp /tmp/mark85-models/Game.ts game/src/game/Game.ts
           echo "Replaced character models and Mark 85 nanotech equipment system from the uploaded project."
 
       - name: Apply low-glare Mark 85 armor polish
