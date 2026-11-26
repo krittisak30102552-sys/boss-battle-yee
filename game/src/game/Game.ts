@@ -330,6 +330,7 @@ export class Game {
 
   // player
   private rig: IronRig;
+  private armorModel: 50 | 85 = 85;
   private combatMode = 0;
   private armorDestroyed = false;
   private tonyHp = TONY_MAX;
@@ -455,6 +456,7 @@ private nano: NanoSystem;
 
     this.rig = buildIronMan();
     this.scene.add(this.rig.root);
+    this.applyArmorModel();
     this.nano = new NanoSystem(this.rig, this.scene);
 
     this.brig = buildThanos();
@@ -778,6 +780,47 @@ private nano: NanoSystem;
   /*  Public controls                                                 */
   /* ---------------------------------------------------------------- */
 
+
+  setArmorModel(model: 50 | 85) {
+    if (this.armorDestroyed) return this.armorModel;
+    this.armorModel = model === 50 ? 50 : 85;
+    this.applyArmorModel();
+    this.say(this.armorModel === 50 ? "MARK 50 · MODEL PRIME" : "MARK 85 · ENDGAME ARMOR", 2.2);
+    return this.armorModel;
+  }
+
+  getArmorModel() {
+    return this.armorModel;
+  }
+
+  private applyArmorModel() {
+    const mark50 = this.armorModel === 50;
+    const palette = new Map<number, number>([
+      [0xd01c28, mark50 ? 0x941522 : 0xd01c28],
+      [0xf6c04a, mark50 ? 0xd7ad55 : 0xf6c04a],
+      [0x9aa3ad, mark50 ? 0x818c99 : 0x9aa3ad],
+      [0x6a0910, mark50 ? 0x4d0b13 : 0x6a0910],
+    ]);
+    this.rig.root.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) {
+        const mat = material as THREE.MeshStandardMaterial;
+        if (!mat.color || !("metalness" in mat)) continue;
+        if (mat.userData.baseColor === undefined) {
+          mat.userData.baseColor = mat.color.getHex();
+          mat.userData.baseMetalness = mat.metalness;
+          mat.userData.baseRoughness = mat.roughness;
+        }
+        const base = mat.userData.baseColor as number;
+        const next = palette.get(base);
+        if (next !== undefined) mat.color.setHex(next);
+        mat.metalness = mark50 && (base === 0xd01c28 || base === 0xf6c04a) ? 0.82 : mat.userData.baseMetalness;
+        mat.roughness = mark50 && (base === 0xd01c28 || base === 0xf6c04a) ? 0.22 : mat.userData.baseRoughness;
+      }
+    });
+  }
 
   toggleSuit() {
   if (this.armorDestroyed) return false;
