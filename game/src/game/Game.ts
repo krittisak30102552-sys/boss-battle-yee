@@ -2429,6 +2429,19 @@ private updatePlayerPose(dt: number) {
       return;
     }
     const p = this.pl;
+    if (this.mark50Cinematic) {
+      // Dedicated Model Prime close-up: frame Tony's Arc Reactor, not the arena.
+      const behindX = -Math.sin(p.heading) * 4.25;
+      const behindZ = -Math.cos(p.heading) * 4.25;
+      const closePosition = this.v1.set(p.pos.x + behindX, p.pos.y + 2.05, p.pos.z + behindZ);
+      const chestTarget = this.v2.set(p.pos.x, p.pos.y + 1.55, p.pos.z);
+      cam.position.lerp(closePosition, 1 - Math.exp(-5.5 * dt));
+      cam.lookAt(chestTarget);
+      this.fov = damp(this.fov, 39, 4.5, dt);
+      cam.fov = this.fov;
+      cam.updateProjectionMatrix();
+      return;
+    }
     const dist = 8.5;
     const cp = Math.cos(this.camPitch);
     const dir = this.v1.set(Math.sin(this.camYaw) * cp, -Math.sin(this.camPitch), Math.cos(this.camYaw) * cp);
