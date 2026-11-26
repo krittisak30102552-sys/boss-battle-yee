@@ -330,6 +330,7 @@ export class Game {
   // player
   private rig: IronRig;
   private combatMode = 0;
+  private armorDestroyed = false;
 private nano: NanoSystem;
   private pl = {
     pos: new THREE.Vector3(0, 0, -24),
@@ -703,17 +704,17 @@ private nano: NanoSystem;
       if (e.code === "KeyP") this.pause();
       if (e.code === "KeyL") this.freeLook = !this.freeLook;
       const wi = WEAPON_INFO.findIndex((w) => w.code === e.code);
-      if (wi >= 0) this.selectWeapon(wi);
-      if (e.code === "KeyT") this.heal();
-      if (e.code === "KeyR") this.toggleSuit();
-      if (e.code === "KeyV") {
+      if (wi >= 0 && !this.armorDestroyed) this.selectWeapon(wi);
+      if (e.code === "KeyT" && !this.armorDestroyed) this.heal();
+      if (e.code === "KeyR" && !this.armorDestroyed) this.toggleSuit();
+      if (e.code === "KeyV" && !this.armorDestroyed) {
         this.setCombatMode(this.combatMode === 0 ? 1 : 0);
         this.selectSkill(this.combatMode === 0 ? 0 : 6);
       }
-      if (e.code === "KeyB") this.toggleWings();
-      if (e.code === "ShiftLeft" || e.code === "ShiftRight") this.dash();
-      if (e.code === "KeyQ") this.selectWeapon((this.nano.pending + WEAPON_COUNT - 1) % WEAPON_COUNT);
-      if (e.code === "KeyE") this.selectWeapon((this.nano.pending + 1) % WEAPON_COUNT);
+      if (e.code === "KeyB" && !this.armorDestroyed) this.toggleWings();
+      if ((e.code === "ShiftLeft" || e.code === "ShiftRight") && !this.armorDestroyed) this.dash();
+      if (e.code === "KeyQ" && !this.armorDestroyed) this.selectWeapon((this.nano.pending + WEAPON_COUNT - 1) % WEAPON_COUNT);
+      if (e.code === "KeyE" && !this.armorDestroyed) this.selectWeapon((this.nano.pending + 1) % WEAPON_COUNT);
     });
     this.on(window, "keyup", (e: KeyboardEvent) => {
       this.keys.delete(e.code);
@@ -777,15 +778,17 @@ private nano: NanoSystem;
 
 
   toggleSuit() {
+  if (this.armorDestroyed) return false;
   return this.suit.toggle();
 }
 
 selectSkill(index: number) {
+  if (this.armorDestroyed) return;
   this.selectWeapon(Math.max(0, Math.min(WEAPON_COUNT - 1, index)));
 }
 
 setAttackHeld(held: boolean) {
-  this.mouseDown = held;
+  this.mouseDown = this.armorDestroyed ? false : held;
 }
 
 touchLook(dx: number, dy: number) {
@@ -839,6 +842,7 @@ touchLook(dx: number, dy: number) {
     p.vel.set(0, 0, 0);
     p.heading = 0;
     p.hp = PLAYER_MAX;
+    this.armorDestroyed = false;
     p.boost = 100;
     p.boostEmpty = false;
     p.dashT = 0;
@@ -933,15 +937,22 @@ touchLook(dx: number, dy: number) {
       this.updateShocks(dt);
     }
 
-    // Keep the visual reveal in sync even on the frame Tony reaches zero HP.
+    // At critical armor condition, trigger the same cinematic plate-release sequence as suit removal.
     const armorRatio = this.pl.hp / PLAYER_MAX;
     this.rig.damageStages.forEach((stage, index) => {
       stage.visible = armorRatio <= [0.82, 0.55, 0.28][index];
     });
-    const tonyExposed = armorRatio <= 0.08;
-    this.rig.armorRoot.visible = !tonyExposed;
-    this.rig.tonyRoot.visible = tonyExposed;
-    this.rig.wreckage.visible = tonyExposed;
+    if (armorRatio <= 0.08 && !this.armorDestroyed) {
+      this.armorDestroyed = true;
+      this.mouseDown = false;
+      this.keys.clear();
+      this.suit.toggle();
+      this.say("ARMOR EJECTED · TONY EXPOSED", 3.2);
+    }
+    // Once the armor has flown clear, leave Tony in the scene and retire the empty suit.
+    if (this.armorDestroyed && this.suit.active && this.suit.mode === "none") {
+      this.rig.root.visible = false;
+    }
 
     this.updatePlayerPose(dt);
     this.suit.update(dt, this.time);
