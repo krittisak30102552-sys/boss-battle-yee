@@ -42,6 +42,9 @@ export interface HudState {
   sentries: number;
   snaps: number;
   hint: string;
+  mark50Available: boolean;
+  mark50Cinematic: boolean;
+  armorModel: 50 | 85;
 }
 
 export const W = {
@@ -333,6 +336,8 @@ export class Game {
   private armorModel: 50 | 85 = 85;
   private combatMode = 0;
   private armorDestroyed = false;
+  private mark50Used = false;
+  private mark50Cinematic = false;
   private tonyHp = TONY_MAX;
 private nano: NanoSystem;
   private pl = {
@@ -478,6 +483,17 @@ private nano: NanoSystem;
       setWeaponHidden: (hide) => this.nano.setHidden(hide),
       onDonned: () => {
         this.armPose = { shR: 0, elR: 0, shL: 0, elL: 0, zR: 0, zL: 0 };
+        if (this.mark50Cinematic) {
+          this.mark50Cinematic = false;
+          this.armorDestroyed = false;
+          this.armorModel = 50;
+          this.pl.hp = PLAYER_MAX;
+          this.tonyHp = TONY_MAX;
+          this.rig.root.visible = true;
+          this.applyArmorModel();
+          this.say("MARK 50 · MODEL PRIME ONLINE", 3.2);
+          this.emitHud(true);
+        }
       },
     });
 
@@ -781,45 +797,39 @@ private nano: NanoSystem;
   /* ---------------------------------------------------------------- */
 
 
-  setArmorModel(model: 50 | 85) {
-    if (this.armorDestroyed) return this.armorModel;
-    this.armorModel = model === 50 ? 50 : 85;
-    this.applyArmorModel();
-    this.say(this.armorModel === 50 ? "MARK 50 · MODEL PRIME" : "MARK 85 · ENDGAME ARMOR", 2.2);
-    return this.armorModel;
-  }
-
   getArmorModel() {
     return this.armorModel;
   }
 
+  activateMark50() {
+    if (this.status !== "playing" || !this.armorDestroyed || this.mark50Used || this.mark50Cinematic) return false;
+    this.mark50Used = true;
+    this.mark50Cinematic = true;
+    this.keys.clear();
+    this.mouseDown = false;
+    this.pl.vel.set(0, 0, 0);
+    this.pl.pos.y = 0;
+    this.armorModel = 50;
+    this.applyArmorModel();
+    this.suit.summonForTony();
+    this.say("ARC REACTOR LINK · MARK 50 DEPLOYING", 4);
+    this.emitHud(true);
+    return true;
+  }
+
   private applyArmorModel() {
-    const mark50 = this.armorModel === 50;
-    const palette = new Map<number, number>([
-      [0xd01c28, mark50 ? 0x941522 : 0xd01c28],
-      [0xf6c04a, mark50 ? 0xd7ad55 : 0xf6c04a],
-      [0x9aa3ad, mark50 ? 0x818c99 : 0x9aa3ad],
-      [0x6a0910, mark50 ? 0x4d0b13 : 0x6a0910],
-    ]);
-    this.rig.root.traverse((object) => {
-      const mesh = object as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) {
-        const mat = material as THREE.MeshStandardMaterial;
-        if (!mat.color || !("metalness" in mat)) continue;
-        if (mat.userData.baseColor === undefined) {
-          mat.userData.baseColor = mat.color.getHex();
-          mat.userData.baseMetalness = mat.metalness;
-          mat.userData.baseRoughness = mat.roughness;
-        }
-        const base = mat.userData.baseColor as number;
-        const next = palette.get(base);
-        if (next !== undefined) mat.color.setHex(next);
-        mat.metalness = mark50 && (base === 0xd01c28 || base === 0xf6c04a) ? 0.82 : mat.userData.baseMetalness;
-        mat.roughness = mark50 && (base === 0xd01c28 || base === 0xf6c04a) ? 0.22 : mat.userData.baseRoughness;
-      }
-    });
+    // Mark 50 uses a lighter, slimmer silhouette instead of a color swap.
+    const slim = this.armorModel === 50;
+    this.rig.body.scale.set(1, 1, 1);
+    for (const group of [this.rig.shR, this.rig.shL, this.rig.elR, this.rig.elL]) group.scale.set(1, 1, 1);
+    for (const group of [this.rig.hipR, this.rig.hipL, this.rig.kneeR, this.rig.kneeL]) group.scale.set(1, 1, 1);
+    if (slim) {
+      this.rig.body.scale.set(0.9, 1.02, 0.88);
+      for (const group of [this.rig.shR, this.rig.shL]) group.scale.set(0.88, 0.98, 0.9);
+      for (const group of [this.rig.elR, this.rig.elL]) group.scale.set(0.9, 1.02, 0.88);
+      for (const group of [this.rig.hipR, this.rig.hipL]) group.scale.set(0.9, 1.02, 0.9);
+      for (const group of [this.rig.kneeR, this.rig.kneeL]) group.scale.set(0.9, 1.04, 0.9);
+    }
   }
 
   toggleSuit() {
@@ -889,6 +899,10 @@ touchLook(dx: number, dy: number) {
     p.hp = PLAYER_MAX;
     this.tonyHp = TONY_MAX;
     this.armorDestroyed = false;
+    this.mark50Used = false;
+    this.mark50Cinematic = false;
+    this.armorModel = 85;
+    this.applyArmorModel();
     p.boost = 100;
     p.boostEmpty = false;
     p.dashT = 0;
@@ -969,12 +983,14 @@ touchLook(dx: number, dy: number) {
     const playing = this.status === "playing";
     if (playing) {
       this.playTime += dt;
-      this.updatePlayer(dt);
-      this.updateBoss(dt);
-      this.updateProjectiles(dt);
-      this.updateShocks(dt);
-      this.updateMeteors(dt);
-      this.updateSentries(dt);
+      if (!this.mark50Cinematic) {
+        this.updatePlayer(dt);
+        this.updateBoss(dt);
+        this.updateProjectiles(dt);
+        this.updateShocks(dt);
+        this.updateMeteors(dt);
+        this.updateSentries(dt);
+      }
     } else if (this.status === "menu") {
       this.updateBossIdleOnly(dt);
     } else if (this.status === "won" || this.status === "lost") {
@@ -1071,6 +1087,9 @@ touchLook(dx: number, dy: number) {
       sentries: this.sentries.length,
       snaps: this.snapCount,
       hint: this.hintT > 0 ? this.hint : "",
+      mark50Available: this.armorDestroyed && !this.mark50Used,
+      mark50Cinematic: this.mark50Cinematic,
+      armorModel: this.armorModel,
     });
   }
 
