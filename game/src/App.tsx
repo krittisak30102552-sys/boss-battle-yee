@@ -260,54 +260,64 @@ useEffect(() => {
                 {hud.tonyExposed ? "EXPOSED" : "ONLINE"}
               </div>
             </div>
-            <div>
-              <div className="text-[10px] font-bold text-cyan-200 mb-1">THRUSTERS</div>
-              <Bar value={hud.boost} max={100} color="linear-gradient(90deg,#06b6d4,#a5f3fc)" h="h-2" />
-            </div>
-            <div className="flex gap-2 text-[11px] font-bold">
-              <div className={`px-2 py-1 border ${hud.healCd > 0 ? "border-white/20 text-white/40" : "border-emerald-300/70 text-emerald-200"} bg-black/50`}>
-                [T] ซ่อม {hud.healCd > 0 ? `${Math.ceil(hud.healCd)}s` : "พร้อม"}
+            {!hud.tonyExposed && (
+              <>
+              <div>
+                <div className="text-[10px] font-bold text-cyan-200 mb-1">THRUSTERS</div>
+                <Bar value={hud.boost} max={100} color="linear-gradient(90deg,#06b6d4,#a5f3fc)" h="h-2" />
               </div>
-              <div className={`px-2 py-1 border ${hud.dashCd > 0 ? "border-white/20 text-white/40" : "border-cyan-300/70 text-cyan-200"} bg-black/50`}>
-                [SHIFT] Dash {hud.dashCd > 0 ? `${hud.dashCd.toFixed(1)}s` : "พร้อม"}
+              <div className="flex gap-2 text-[11px] font-bold">
+                <div className={`px-2 py-1 border ${hud.healCd > 0 ? "border-white/20 text-white/40" : "border-emerald-300/70 text-emerald-200"} bg-black/50`}>
+                  [T] ซ่อม {hud.healCd > 0 ? `${Math.ceil(hud.healCd)}s` : "พร้อม"}
+                </div>
+                <div className={`px-2 py-1 border ${hud.dashCd > 0 ? "border-white/20 text-white/40" : "border-cyan-300/70 text-cyan-200"} bg-black/50`}>
+                  [SHIFT] Dash {hud.dashCd > 0 ? `${hud.dashCd.toFixed(1)}s` : "พร้อม"}
+                </div>
               </div>
-            </div>
+              </>
+            )}
           </div>
 
-          {/* current form + skill bar */}
-          <div className="absolute bottom-[82px] left-1/2 -translate-x-1/2 rounded-md border border-cyan-300/40 bg-slate-950/85 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.18)]">
-            {combatMode === 1 ? "FORM 2 · NANO WINGS DEPLOYED" : "FORM 1 · STANDARD CONFIG"}
-          </div>
-          {/* weapons */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex w-[calc(100%-1rem)] max-w-[720px] justify-center gap-1 sm:gap-2">
-            {visibleWeapons.map((w, i) => {
-                const skillIndex = combatMode === 0 ? i : i + 6;
-              const active = hud.weapon === skillIndex;
-              return (
-                <div
-                  key={w.key}
-                  className={`relative min-w-0 max-w-[110px] flex-1 px-1 sm:px-2 py-2 border-2 skew-x-[-8deg] transition ${
-                    active ? "border-amber-300 bg-red-700/60 scale-110 shadow-[0_0_20px_rgba(251,191,36,0.6)]" : "border-white/20 bg-black/55 opacity-70"
-                  }`}
-                >
-                  <div className="skew-x-[8deg]">
-                    <div className="text-[10px] text-amber-200 font-black">[{w.key}]</div>
-                    <div className="text-[11px] sm:text-xs font-black leading-tight">{w.th}</div>
-                    <div className="text-[9px] text-white/60 hidden sm:block">{w.name}</div>
-                    {active && i === 3 && hud.charge > 0 && (
-                      <div className="mt-1">
-                        <Bar value={hud.charge} max={1} color="linear-gradient(90deg,#f97316,#fde047)" h="h-1.5" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {hud.morphing && (
-            <div className="absolute bottom-[104px] left-1/2 -translate-x-1/2 text-cyan-200 text-xs font-black tracking-[0.3em] animate-pulse">
-              NANOBOTS REFORMING…
+          {!hud.tonyExposed && (
+            <>
+            {/* current form + skill bar */}
+            <div className="absolute bottom-[82px] left-1/2 -translate-x-1/2 rounded-md border border-cyan-300/40 bg-slate-950/85 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.18)]">
+              {combatMode === 1 ? "FORM 2 · NANO WINGS DEPLOYED" : "FORM 1 · STANDARD CONFIG"}
             </div>
+            {/* weapons */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex w-[calc(100%-1rem)] max-w-[720px] justify-center gap-1 sm:gap-2">
+              {visibleWeapons.map((w, i) => {
+                  const skillIndex = combatMode === 0 ? i : i + 6;
+                const active = hud.weapon === skillIndex;
+                return (
+                  <div
+                    key={w.key}
+                    className={`relative min-w-0 max-w-[110px] flex-1 px-1 sm:px-2 py-2 border-2 skew-x-[-8deg] transition ${
+                      active ? "border-amber-300 bg-red-700/60 scale-110 shadow-[0_0_20px_rgba(251,191,36,0.6)]" : "border-white/20 bg-black/55 opacity-70"
+                    }`}
+                  >
+                    <div className="skew-x-[8deg]">
+                      <div className="text-[10px] text-amber-200 font-black">[{w.key}]</div>
+                      <div className="text-[11px] sm:text-xs font-black leading-tight">{w.th}</div>
+                      <div className="text-[9px] text-white/60 hidden sm:block">{w.name}</div>
+                      {active && i === 3 && hud.charge > 0 && (
+                        <div className="mt-1">
+                          <Bar value={hud.charge} max={1} color="linear-gradient(90deg,#f97316,#fde047)" h="h-1.5" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {hud.morphing && (
+              <div className="absolute bottom-[104px] left-1/2 -translate-x-1/2 text-cyan-200 text-xs font-black tracking-[0.3em] animate-pulse">
+                NANOBOTS REFORMING…
+              </div>
+            )}
+  
+  
+            </>
           )}
 
           {/* top right */}
