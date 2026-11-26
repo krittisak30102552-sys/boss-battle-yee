@@ -205,6 +205,7 @@ export class SuitSystem {
   private tmp2 = new THREE.Vector3();
   private gesture = 0;
   private reactorBoost = 0;
+  private summoning = false;
   private cyan = new THREE.Color(0.5, 1.8, 2.6);
   private gold = new THREE.Color(2.4, 1.6, 0.5);
   private white = new THREE.Color(2.4, 2.6, 2.8);
@@ -382,6 +383,29 @@ export class SuitSystem {
     return this.active;
   }
 
+  /** Clear the shattered Mark 85 and launch the reserve Mark 50 toward Tony. */
+  summonForTony() {
+    this.clearDebris();
+    this.restorePieces();
+    this.ctx.setWeaponHidden(true);
+    this.assemblyMesh.visible = false;
+    this.active = true;
+    this.mode = "approach";
+    this.t = 0;
+    this.summoning = true;
+    const { pos, heading } = this.ctx.player();
+    this.tony.root.visible = true;
+    this.root.visible = true;
+    this.root.position.set(pos.x - 10, pos.y + 4.5, pos.z - 8);
+    this.root.rotation.set(0, heading, 0);
+    this.setFlames(true, 1);
+    for (const piece of this.pieces) {
+      piece.released = false;
+      piece.locked = false;
+    }
+    sfx.whoosh();
+  }
+
   /** Break the armor apart around Tony and leave every plate on the ground. */
   breakApart() {
     if (this.active && this.mode === "none") return;
@@ -452,6 +476,7 @@ export class SuitSystem {
     this.active = false;
     this.t = 0;
     this.cinematic = 0;
+    this.summoning = false;
     this.assemblyMesh.visible = false;
     this.tony.root.visible = false;
     this.root.visible = true;
@@ -711,6 +736,7 @@ export class SuitSystem {
       this.t = 0;
       this.reactorBoost = 1.2;
       this.ctx.setWeaponHidden(false);
+      this.summoning = false;
       this.ctx.onDonned();
     }
   }
@@ -727,6 +753,7 @@ export class SuitSystem {
     const air = !o.grounded;
     const g = this.gesture;
     const breathe = Math.sin(time * 2.0);
+    const touchReactor = this.summoning && this.mode === "approach";
 
     t.hipR.rotation.x = damp(t.hipR.rotation.x, air ? 0.3 : sw, 16, dt);
     t.hipL.rotation.x = damp(t.hipL.rotation.x, air ? -0.2 : -sw, 16, dt);
@@ -735,12 +762,12 @@ export class SuitSystem {
 
     // arms swing opposite to the legs; spread out like in the film while the armor peels away
     const swing = air ? 0.4 : sw * 0.8;
-    t.shR.rotation.x = damp(t.shR.rotation.x, swing * 1 - g * 0.15, 14, dt);
-    t.shL.rotation.x = damp(t.shL.rotation.x, -swing - g * 0.15, 14, dt);
-    t.shR.rotation.z = damp(t.shR.rotation.z, -g * 0.65 - 0.05 + breathe * 0.01, 9, dt);
-    t.shL.rotation.z = damp(t.shL.rotation.z, g * 0.65 + 0.05 - breathe * 0.01, 9, dt);
-    t.elR.rotation.x = damp(t.elR.rotation.x, -0.25 - amp * 0.7 - g * 0.1, 12, dt);
-    t.elL.rotation.x = damp(t.elL.rotation.x, -0.25 - amp * 0.7 - g * 0.1, 12, dt);
+    t.shR.rotation.x = damp(t.shR.rotation.x, touchReactor ? -0.9 : swing * 1 - g * 0.15, 14, dt);
+    t.shL.rotation.x = damp(t.shL.rotation.x, touchReactor ? -0.9 : -swing - g * 0.15, 14, dt);
+    t.shR.rotation.z = damp(t.shR.rotation.z, touchReactor ? -0.75 : -g * 0.65 - 0.05 + breathe * 0.01, 9, dt);
+    t.shL.rotation.z = damp(t.shL.rotation.z, touchReactor ? 0.75 : g * 0.65 + 0.05 - breathe * 0.01, 9, dt);
+    t.elR.rotation.x = damp(t.elR.rotation.x, touchReactor ? -1.3 : -0.25 - amp * 0.7 - g * 0.1, 12, dt);
+    t.elL.rotation.x = damp(t.elL.rotation.x, touchReactor ? -1.3 : -0.25 - amp * 0.7 - g * 0.1, 12, dt);
 
     t.body.position.y = damp(t.body.position.y, 1.0 + Math.abs(Math.cos(o.walk)) * 0.035 * amp * (air ? 0 : 1) + breathe * 0.006, 20, dt);
     t.body.rotation.x = damp(t.body.rotation.x, Math.min(0.2, o.speed / 45) - g * 0.06, 8, dt);
