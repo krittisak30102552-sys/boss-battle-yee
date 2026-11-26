@@ -753,7 +753,7 @@ export class SuitSystem {
     const air = !o.grounded;
     const g = this.gesture;
     const breathe = Math.sin(time * 2.0);
-    const touchReactor = this.summoning && this.mode === "approach";
+    const touchReactor = this.summoning;
 
     t.hipR.rotation.x = damp(t.hipR.rotation.x, air ? 0.3 : sw, 16, dt);
     t.hipL.rotation.x = damp(t.hipL.rotation.x, air ? -0.2 : -sw, 16, dt);
@@ -762,12 +762,13 @@ export class SuitSystem {
 
     // arms swing opposite to the legs; spread out like in the film while the armor peels away
     const swing = air ? 0.4 : sw * 0.8;
-    t.shR.rotation.x = damp(t.shR.rotation.x, touchReactor ? -0.9 : swing * 1 - g * 0.15, 14, dt);
-    t.shL.rotation.x = damp(t.shL.rotation.x, touchReactor ? -0.9 : -swing - g * 0.15, 14, dt);
-    t.shR.rotation.z = damp(t.shR.rotation.z, touchReactor ? -0.75 : -g * 0.65 - 0.05 + breathe * 0.01, 9, dt);
-    t.shL.rotation.z = damp(t.shL.rotation.z, touchReactor ? 0.75 : g * 0.65 + 0.05 - breathe * 0.01, 9, dt);
-    t.elR.rotation.x = damp(t.elR.rotation.x, touchReactor ? -1.3 : -0.25 - amp * 0.7 - g * 0.1, 12, dt);
-    t.elL.rotation.x = damp(t.elL.rotation.x, touchReactor ? -1.3 : -0.25 - amp * 0.7 - g * 0.1, 12, dt);
+    // Tony raises one hand across his chest to touch the Arc Reactor and holds the pose through assembly.
+    t.shR.rotation.x = damp(t.shR.rotation.x, touchReactor ? -1.25 : swing * 1 - g * 0.15, 14, dt);
+    t.shL.rotation.x = damp(t.shL.rotation.x, touchReactor ? 0.05 : -swing - g * 0.15, 14, dt);
+    t.shR.rotation.z = damp(t.shR.rotation.z, touchReactor ? 0.72 : -g * 0.65 - 0.05 + breathe * 0.01, 9, dt);
+    t.shL.rotation.z = damp(t.shL.rotation.z, touchReactor ? 0.05 : g * 0.65 + 0.05 - breathe * 0.01, 9, dt);
+    t.elR.rotation.x = damp(t.elR.rotation.x, touchReactor ? -1.45 : -0.25 - amp * 0.7 - g * 0.1, 12, dt);
+    t.elL.rotation.x = damp(t.elL.rotation.x, touchReactor ? -0.25 : -0.25 - amp * 0.7 - g * 0.1, 12, dt);
 
     t.body.position.y = damp(t.body.position.y, 1.0 + Math.abs(Math.cos(o.walk)) * 0.035 * amp * (air ? 0 : 1) + breathe * 0.006, 20, dt);
     t.body.rotation.x = damp(t.body.rotation.x, Math.min(0.2, o.speed / 45) - g * 0.06, 8, dt);
