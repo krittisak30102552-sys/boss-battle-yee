@@ -92,6 +92,11 @@ export default function App() {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
     const [combatMode, setCombatMode] = useState<0 | 1>(0);
+    const [armorModel, setArmorModel] = useState<50 | 85>(85);
+    const chooseArmorModel = (model: 50 | 85) => {
+      setArmorModel(model);
+      gameRef.current?.setArmorModel(model);
+    };
     const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
     const switchCombatMode = () => {
       const next = combatMode === 0 ? 1 : 0;
@@ -240,7 +245,7 @@ useEffect(() => {
           <div className="absolute left-4 bottom-4 w-[min(320px,44vw)] space-y-2">
             <div className="border border-red-300/35 bg-black/65 p-2">
               <div className="flex justify-between text-xs font-black tracking-wider text-red-200 mb-1">
-                <span>{hud.tonyExposed ? "TONY STARK · VITALS" : "ARMOR · MARK 85"}</span>
+                <span>{hud.tonyExposed ? "TONY STARK · VITALS" : `ARMOR · MARK ${armorModel}`}</span>
                 <span>{hud.playerHp}/{hud.playerMax}</span>
               </div>
               <Bar value={hud.playerHp} max={hud.playerMax} color={hud.tonyExposed ? "linear-gradient(90deg,#0891b2,#67e8f9)" : "linear-gradient(90deg,#dc2626,#f59e0b)"} h="h-4" />
@@ -399,6 +404,17 @@ useEffect(() => {
           {settingsOpen && (
             <div className="pointer-events-auto absolute right-4 top-16 z-[90] w-64 rounded-2xl border border-cyan-300/40 bg-slate-950/95 p-4 text-white shadow-2xl">
               <div className="mb-3 text-sm font-black text-cyan-200">ตั้งค่าการควบคุม</div>
+              <div className="mb-2 text-[11px] font-black text-amber-200">เลือกชุดเกราะ</div>
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => chooseArmorModel(85)}
+                  className={`rounded-lg border px-2 py-2 text-xs font-black ${armorModel === 85 ? "border-amber-300 bg-amber-500/25 text-amber-100" : "border-white/20 bg-white/5 text-white/65"}`}>
+                  MARK 85
+                </button>
+                <button type="button" onClick={() => chooseArmorModel(50)}
+                  className={`rounded-lg border px-2 py-2 text-xs font-black ${armorModel === 50 ? "border-amber-300 bg-amber-500/25 text-amber-100" : "border-white/20 bg-white/5 text-white/65"}`}>
+                  MARK 50
+                </button>
+              </div>
               <button type="button"
                 onClick={() => { setDeviceMode((v) => v === "mobile" ? "desktop" : "mobile"); setSettingsOpen(false); }}
                 className="mb-3 w-full rounded-lg border border-cyan-300/50 bg-cyan-500/15 px-3 py-2 text-left text-xs font-bold">
@@ -410,7 +426,7 @@ useEffect(() => {
               </button>
               <div className="space-y-1 text-[11px] leading-relaxed text-white/75">
                 <div>V — เข้า / ออก FORM 2 · กางปีกอัตโนมัติ</div>
-                <div>R — ถอดชุด / ใส่ชุด Mark 85</div>
+                <div>R — ถอดชุด / ใส่ชุด Mark {armorModel}</div>
                 <div>B — กาง / พับปีกนาโน</div>
                 <div>T — ซ่อมเกราะ</div>
                 <div>1–9, 0 — เลือกสกิล</div>
@@ -430,14 +446,24 @@ useEffect(() => {
             <div className="text-amber-300 tracking-[0.5em] text-xs font-bold mb-2">NANO TECH BOSS FIGHT</div>
             <h1 className="text-4xl sm:text-6xl font-black leading-none">
               <span className="text-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.2)]">IRON MAN</span>
-              <span className="text-amber-300"> MK-85</span>
+              <span className="text-amber-300"> MK-{armorModel}</span>
               <div className="text-2xl sm:text-3xl text-white/80 my-2 tracking-widest">VS</div>
               <span className="text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.22)]">THANOS</span>
             </h1>
-            <p className="mt-5 text-white/80 text-sm sm:text-base leading-relaxed">
-              สนามรบบนไททัน — ธานอสถือเกาน์ทเล็ตอินฟินิตี้อยู่ตรงหน้า ใช้เกราะนาโนบอทของ Mark 51 ที่เปลี่ยนเป็นอาวุธได้ทุกแบบ
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <button type="button" onClick={() => chooseArmorModel(85)}
+                className={`border px-4 py-2 text-xs font-black ${armorModel === 85 ? "border-amber-300 bg-amber-500/20 text-amber-100" : "border-white/25 bg-black/50 text-white/65"}`}>
+                MARK 85 · ENDGAME
+              </button>
+              <button type="button" onClick={() => chooseArmorModel(50)}
+                className={`border px-4 py-2 text-xs font-black ${armorModel === 50 ? "border-amber-300 bg-amber-500/20 text-amber-100" : "border-white/25 bg-black/50 text-white/65"}`}>
+                MARK 50 · MODEL PRIME
+              </button>
+            </div>
+            <p className="mt-4 text-white/80 text-sm sm:text-base leading-relaxed">
+              สนามรบบนไททัน — เลือกชุดเกราะนาโน Mark 85 หรือ Mark 50 แล้วเข้าสู้กับธานอส
               <br />
-              โจมตีเปลี่ยนอาวุธได้ทันที แล้วโค่นเขาให้ได้!
+              เปลี่ยนชุดได้อีกครั้งในเมนูตั้งค่าระหว่างเล่น
             </p>
 
             <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
