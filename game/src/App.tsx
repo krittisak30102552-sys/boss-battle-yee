@@ -175,6 +175,12 @@ useEffect(() => {
 }, []);
 
     const bossPct = hud.bossHp / hud.bossMax;
+  const armorRatio = hud.playerMax > 0 ? hud.playerHp / hud.playerMax : 1;
+  const armorCondition = armorRatio <= 0.2
+    ? { label: "CRITICAL DAMAGE · เกราะเสียหายหนัก", color: "border-red-400 text-red-200", glow: "0 0 16px rgba(248,113,113,0.45)" }
+    : armorRatio <= 0.5
+      ? { label: "ARMOR DAMAGED · เกราะเสียหาย", color: "border-amber-300 text-amber-200", glow: "0 0 12px rgba(251,191,36,0.25)" }
+      : { label: "ARMOR STABLE · เกราะปกติ", color: "border-emerald-300/60 text-emerald-200", glow: "none" };
   const showHud = hud.status === "playing" || hud.status === "paused";
 
   return (
@@ -236,6 +242,10 @@ useEffect(() => {
                 </span>
               </div>
               <Bar value={hud.playerHp} max={hud.playerMax} color="linear-gradient(90deg,#dc2626,#f59e0b)" h="h-4" />
+            </div>
+            <div className={`mt-1 inline-flex items-center gap-2 border bg-black/65 px-2 py-1 text-[10px] font-black tracking-wide ${armorCondition.color}`} style={{ boxShadow: armorCondition.glow }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+              {armorCondition.label}
             </div>
             <div>
               <div className="text-[10px] font-bold text-cyan-200 mb-1">THRUSTERS</div>
