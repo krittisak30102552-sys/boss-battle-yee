@@ -146,6 +146,14 @@ interface Piece {
   locked: boolean;
 }
 
+interface ArmorDebris {
+  piece: Piece;
+  parent: THREE.Object3D;
+  velocity: THREE.Vector3;
+  spin: THREE.Vector3;
+  settled: boolean;
+}
+
 interface AssemblyParticle {
   target: THREE.Vector3;
   start: number;
@@ -188,6 +196,7 @@ export class SuitSystem {
   private t = 0;
   private ctx: SuitCtx;
   private pieces: Piece[] = [];
+  private debris: ArmorDebris[] = [];
   private assemblyMesh!: THREE.InstancedMesh;
   private assemblyParticles: AssemblyParticle[] = [];
   private assemblyDummy = new THREE.Object3D();
@@ -373,7 +382,72 @@ export class SuitSystem {
     return this.active;
   }
 
+  /** Break the armor apart around Tony and leave every plate on the ground. */
+  breakApart() {
+    if (this.active && this.mode === "none") return;
+    this.root.updateMatrixWorld(true);
+    this.debris = [];
+    this.ctx.setWeaponHidden(true);
+    this.assemblyMesh.visible = false;
+    this.tony.root.visible = true;
+    this.active = true;
+    this.mode = "none";
+    this.t = 0;
+    this.setFlames(false, 0);
+
+    for (const piece of this.pieces) {
+      const parent = piece.mesh.parent;
+      if (!parent) continue;
+      const world = piece.mesh.getWorldPosition(new THREE.Vector3());
+      const side = world.x - this.root.position.x;
+      const front = world.z - this.root.position.z;
+      const outward = new THREE.Vector3(side + (Math.random() - 0.5) * 0.9, 0, front + (Math.random() - 0.5) * 0.9);
+      if (outward.lengthSq() < 0.01) outward.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      outward.normalize();
+      this.ctx.scene.attach(piece.mesh);
+      this.debris.push({
+        piece,
+        parent,
+        velocity: new THREE.Vector3(outward.x * (1.2 + Math.random() * 2.2), 2.2 + Math.random() * 3.8, outward.z * (1.2 + Math.random() * 2.2)),
+        spin: new THREE.Vector3((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7),
+        settled: false,
+      });
+    }
+    this.root.visible = false;
+    sfx.suitUnlock();
+  }
+
+  private updateDebris(dt: number) {
+    for (const item of this.debris) {
+      if (item.settled) continue;
+      const mesh = item.piece.mesh;
+      item.velocity.y -= 18 * dt;
+      mesh.position.addScaledVector(item.velocity, dt);
+      mesh.rotation.x += item.spin.x * dt;
+      mesh.rotation.y += item.spin.y * dt;
+      mesh.rotation.z += item.spin.z * dt;
+      if (mesh.position.y <= 0.055) {
+        mesh.position.y = 0.055;
+        item.velocity.set(0, 0, 0);
+        item.spin.set(0, 0, 0);
+        item.settled = true;
+      }
+    }
+  }
+
+  private clearDebris() {
+    for (const item of this.debris) {
+      const { piece, parent } = item;
+      parent.add(piece.mesh);
+      piece.mesh.position.copy(piece.base);
+      piece.mesh.rotation.copy(piece.baseRot);
+      piece.mesh.scale.copy(piece.baseScale);
+    }
+    this.debris = [];
+  }
+
   reset() {
+    this.clearDebris();
     this.mode = "none";
     this.active = false;
     this.t = 0;
@@ -436,6 +510,7 @@ export class SuitSystem {
   /* ---------------- per-frame ---------------- */
 
   update(dt: number, time: number) {
+    this.updateDebris(dt);
     // cinematic camera factor
     const cine = this.mode === "remove" || this.mode === "approach" || this.mode === "close";
     this.cinematic = damp(this.cinematic, cine ? 1 : 0, cine ? 3 : 2.2, dt);
