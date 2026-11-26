@@ -403,9 +403,11 @@ export class SuitSystem {
     for (const piece of this.pieces) {
       piece.released = false;
       piece.locked = false;
-      // Hold each plate as a small hovering fragment until the chest-originating
-      // nanotech stream reaches it and draws it into its final armor position.
-      this.place(piece, 1, 0, 0.35, 0);
+      // Keep every armor plate hidden at its final location. The cinematic grows
+      // each surface out from Tony's chest; no plates hover or fly toward him.
+      piece.mesh.position.copy(piece.base);
+      piece.mesh.rotation.copy(piece.baseRot);
+      piece.mesh.scale.set(0, 0, 0);
     }
     sfx.suitUnlock();
   }
@@ -709,27 +711,40 @@ export class SuitSystem {
     r.rotation.y += angDiff(r.rotation.y, heading) * (1 - Math.exp(-14 * dt));
     r.rotation.x = damp(r.rotation.x, 0, 10, dt);
     this.neutralize(dt, 10);
-    this.updateAssemblyStream(t, time);
+    // Hold on the Arc Reactor first, then let fine nanotech stream outward.
+    // The armor geometry itself grows in-place over Tony instead of arriving as
+    // detached floating plates.
+    const flowT = Math.max(0, t - 0.72);
+    this.updateAssemblyStream(flowT, time);
 
+    let allCovered = true;
     for (const p of this.pieces) {
-      // The chest stream reaches feet and arms first; the helmet locks last.
-      const ds = (1 - p.order) * P_CSPREAD;
-      const u = clamp01((t - ds) / P_CLOSE);
-      const e = 1 - easeInOutCubic(u);
+      const chest = new THREE.Vector3(0, 1.55, 0.2);
+      const distance = p.base.distanceTo(chest);
+      const delay = 0.08 + clamp01(distance / 2.65) * 1.05;
+      const duration = 0.42 + (p.order < 0.12 ? 0.28 : 0);
+      const u = clamp01((flowT - delay) / duration);
+      const reveal = easeOutCubic(u);
+      p.mesh.position.copy(p.base);
+      p.mesh.rotation.copy(p.baseRot);
+      p.mesh.scale.copy(p.baseScale).multiplyScalar(reveal);
+      const glow = u > 0 && u < 1 ? Math.sin(Math.PI * u) : 0;
+      if (p.flashable) {
+        const mat = p.mesh.material as THREE.MeshStandardMaterial;
+        mat.emissive.setRGB(0.12 * glow, 0.5 * glow, 0.68 * glow);
+      }
+      if (u < 1) allCovered = false;
       if (u >= 1 && !p.locked) {
         p.locked = true;
-        this.burst(p, p.order < 0.12 ? this.white : this.gold, p.order < 0.12 ? 8 : 3, p.order < 0.12 ? 4 : 2.5);
-        sfx.clank();
+        this.burst(p, p.order < 0.12 ? this.white : this.gold, p.order < 0.12 ? 5 : 2, 2.2);
         if (p.order < 0.06) {
           this.reactorBoost = 1;
           sfx.suitLock();
         }
       }
-      const glow = u > 0 && u < 1 ? Math.sin(Math.PI * u) * 0.9 : 0;
-      this.place(p, e, time, glow, 0);
     }
 
-    if (t >= P_CSPREAD + P_CLOSE) {
+    if (allCovered && flowT > 1.75) {
       this.assemblyMesh.visible = false;
       this.restorePieces();
       this.root.position.copy(pos);
