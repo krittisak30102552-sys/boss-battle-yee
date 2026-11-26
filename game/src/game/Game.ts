@@ -1032,7 +1032,7 @@ touchLook(dx: number, dy: number) {
   /* ---------------------------------------------------------------- */
 
   private selectWeapon(i: number) {
-    if (this.status !== "playing") return;
+    if (this.status !== "playing" || this.armorDestroyed) return;
     if (i === this.nano.pending && this.nano.ready && i === this.nano.current) return;
     if (this.nano.switchTo(i)) sfx.morph();
     const pl = this.pl;
@@ -1050,6 +1050,7 @@ touchLook(dx: number, dy: number) {
   }
 
   private dash() {
+    if (this.armorDestroyed) return;
     const p = this.pl;
     if (p.dashCd > 0 || p.dashT > 0) return;
     const fwd = this.v1.set(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));
@@ -1071,6 +1072,7 @@ touchLook(dx: number, dy: number) {
   }
 
   private heal() {
+    if (this.armorDestroyed) return;
     const p = this.pl;
     if (p.healCd > 0 || p.hp >= PLAYER_MAX) return;
     p.hp = Math.min(PLAYER_MAX, p.hp + 80);
@@ -2149,6 +2151,7 @@ private updatePlayerPose(dt: number) {
 
   /* ---- Nano Lightning Refocuser fins ---- */
   setCombatMode(mode: number) {
+    if (this.armorDestroyed) return this.combatMode;
     this.combatMode = mode === 1 ? 1 : 0;
     const shield = this.nano.weapons[W.SHIELD].glow;
     if (shield) {
@@ -2161,6 +2164,7 @@ private updatePlayerPose(dt: number) {
   }
 
   toggleWings() {
+    if (this.armorDestroyed) return this.wingsManual;
     this.wingsManual = !this.wingsManual;
     return this.wingsManual;
   }
