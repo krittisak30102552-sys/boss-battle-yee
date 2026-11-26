@@ -2138,7 +2138,8 @@ private updatePlayerPose(dt: number) {
 
   /** while Tony is out of the suit the empty Mark 85 hovers around Thanos and fires on its own */
   private updateCompanion(dt: number) {
-    if (this.status !== "playing" || !this.suit.companionReady) return;
+    // The autonomous armor companion is disabled once the suit has shattered.
+    if (this.armorDestroyed || this.status !== "playing" || !this.suit.companionReady) return;
     const p = this.pl;
     p.snd -= dt;
     if (p.snd > 0) return;
