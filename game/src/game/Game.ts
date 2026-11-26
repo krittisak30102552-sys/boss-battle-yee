@@ -334,6 +334,7 @@ export class Game {
   // player
   private rig: IronRig;
   private armorModel: 50 | 85 = 85;
+  private mark85Colors: THREE.Color[] = [];
   private combatMode = 0;
   private armorDestroyed = false;
   private mark50Used = false;
@@ -461,6 +462,7 @@ private nano: NanoSystem;
 
     this.rig = buildIronMan();
     this.scene.add(this.rig.root);
+    this.mark85Colors = this.rig.mats.map(({ mat }) => mat.color.clone());
     this.applyArmorModel();
     this.nano = new NanoSystem(this.rig, this.scene);
 
@@ -832,17 +834,26 @@ private nano: NanoSystem;
   }
 
   private applyArmorModel() {
-    // Mark 50 uses a lighter, slimmer silhouette instead of a color swap.
+    // Mark 50 keeps the same rig for now, but uses a narrower silhouette and a red-dominant finish.
     const slim = this.armorModel === 50;
     this.rig.body.scale.set(1, 1, 1);
     for (const group of [this.rig.shR, this.rig.shL, this.rig.elR, this.rig.elL]) group.scale.set(1, 1, 1);
     for (const group of [this.rig.hipR, this.rig.hipL, this.rig.kneeR, this.rig.kneeL]) group.scale.set(1, 1, 1);
+    this.rig.mats.forEach(({ mat }, index) => {
+      const base = this.mark85Colors[index];
+      if (!base) return;
+      mat.color.copy(base);
+      if (slim) {
+        if (base.getHex() === 0xf6c04a) mat.color.setHex(0xc98232);
+        else if (base.getHex() === 0xd01c28) mat.color.setHex(0xe51b2a);
+      }
+    });
     if (slim) {
-      this.rig.body.scale.set(0.9, 1.02, 0.88);
-      for (const group of [this.rig.shR, this.rig.shL]) group.scale.set(0.88, 0.98, 0.9);
-      for (const group of [this.rig.elR, this.rig.elL]) group.scale.set(0.9, 1.02, 0.88);
-      for (const group of [this.rig.hipR, this.rig.hipL]) group.scale.set(0.9, 1.02, 0.9);
-      for (const group of [this.rig.kneeR, this.rig.kneeL]) group.scale.set(0.9, 1.04, 0.9);
+      this.rig.body.scale.set(0.84, 1.01, 0.86);
+      for (const group of [this.rig.shR, this.rig.shL]) group.scale.set(0.82, 0.96, 0.86);
+      for (const group of [this.rig.elR, this.rig.elL]) group.scale.set(0.85, 1.01, 0.86);
+      for (const group of [this.rig.hipR, this.rig.hipL]) group.scale.set(0.84, 1.01, 0.87);
+      for (const group of [this.rig.kneeR, this.rig.kneeL]) group.scale.set(0.84, 1.03, 0.87);
     }
   }
 
