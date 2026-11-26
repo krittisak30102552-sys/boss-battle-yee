@@ -88,6 +88,7 @@ export const WEAPON_INFO: WeaponInfo[] = [
 const ARENA_R = 58;
 const BOSS_MAX = 3000;
 const PLAYER_MAX = 250;
+const TONY_MAX = 250;
 const TAU = Math.PI * 2;
 
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
@@ -331,6 +332,7 @@ export class Game {
   private rig: IronRig;
   private combatMode = 0;
   private armorDestroyed = false;
+  private tonyHp = TONY_MAX;
 private nano: NanoSystem;
   private pl = {
     pos: new THREE.Vector3(0, 0, -24),
@@ -842,6 +844,7 @@ touchLook(dx: number, dy: number) {
     p.vel.set(0, 0, 0);
     p.heading = 0;
     p.hp = PLAYER_MAX;
+    this.tonyHp = TONY_MAX;
     this.armorDestroyed = false;
     p.boost = 100;
     p.boostEmpty = false;
@@ -940,10 +943,11 @@ touchLook(dx: number, dy: number) {
     // At critical armor condition, trigger the same cinematic plate-release sequence as suit removal.
     const armorRatio = this.pl.hp / PLAYER_MAX;
     this.rig.damageStages.forEach((stage, index) => {
-      stage.visible = armorRatio <= [0.82, 0.55, 0.28][index];
+      stage.visible = !this.armorDestroyed && armorRatio <= [0.82, 0.55, 0.28][index];
     });
     if (armorRatio <= 0.08 && !this.armorDestroyed) {
       this.armorDestroyed = true;
+      this.tonyHp = TONY_MAX;
       this.mouseDown = false;
       this.keys.clear();
       this.suit.toggle();
@@ -998,9 +1002,9 @@ touchLook(dx: number, dy: number) {
     }
     this.onHud({
       status: this.status,
-      playerHp: Math.max(0, Math.ceil(this.pl.hp)),
-      playerMax: PLAYER_MAX,
-      tonyExposed: this.pl.hp / PLAYER_MAX <= 0.08,
+      playerHp: Math.max(0, Math.ceil(this.armorDestroyed ? this.tonyHp : this.pl.hp)),
+      playerMax: this.armorDestroyed ? TONY_MAX : PLAYER_MAX,
+      tonyExposed: this.armorDestroyed,
       bossHp: Math.max(0, Math.ceil(b.hp)),
       bossMax: BOSS_MAX,
       boost: this.pl.boost,
@@ -1849,14 +1853,16 @@ touchLook(dx: number, dy: number) {
         for (let i = 0; i < 12; i++) this.fx.spawn(p.pos.x + Math.sin(p.heading) * 1.4, p.pos.y + 1.3, p.pos.z + Math.cos(p.heading) * 1.4, rnd(-5, 5), rnd(-2, 5), rnd(-5, 5), 0.3, 0.15, c);
       }
     }
-    p.hp -= dmg;
+    if (this.armorDestroyed) this.tonyHp = Math.max(0, this.tonyHp - dmg);
+    else p.hp = Math.max(0, p.hp - dmg);
     p.flash = 1;
     p.invul = 0.3;
     this.hurtCount++;
     this.shake = Math.max(this.shake, 0.25 + Math.min(0.6, dmg / 60));
     sfx.hurt();
-    if (p.hp <= 0) {
-      p.hp = 0;
+    if ((this.armorDestroyed && this.tonyHp <= 0) || (!this.armorDestroyed && p.hp <= 0)) {
+      if (this.armorDestroyed) this.tonyHp = 0;
+      else p.hp = 0;
       this.status = "lost";
       this.mouseDown = false;
       if (document.pointerLockElement === this.canvas) document.exitPointerLock();
