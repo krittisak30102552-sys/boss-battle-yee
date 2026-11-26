@@ -179,12 +179,12 @@ useEffect(() => {
     const bossPct = hud.bossHp / hud.bossMax;
   const armorRatio = hud.playerMax > 0 ? hud.playerHp / hud.playerMax : 1;
   const armorCondition = hud.tonyExposed
-    ? { label: "ARMOR DESTROYED · เกราะแตกทั้งหมด", color: "border-red-400 text-red-200", glow: "0 0 18px rgba(248,113,113,0.6)" }
+    ? { label: "TONY VITALS · โทนี่มีชีวิตอยู่", color: "border-cyan-300 text-cyan-100", glow: "0 0 18px rgba(34,211,238,0.45)" }
     : armorRatio <= 0.2
       ? { label: "CRITICAL DAMAGE · เกราะเสียหายหนัก", color: "border-red-400 text-red-200", glow: "0 0 16px rgba(248,113,113,0.45)" }
-    : armorRatio <= 0.5
-      ? { label: "ARMOR DAMAGED · เกราะเสียหาย", color: "border-amber-300 text-amber-200", glow: "0 0 12px rgba(251,191,36,0.25)" }
-      : { label: "ARMOR STABLE · เกราะปกติ", color: "border-emerald-300/60 text-emerald-200", glow: "none" };
+      : armorRatio <= 0.5
+        ? { label: "ARMOR DAMAGED · เกราะเสียหาย", color: "border-amber-300 text-amber-200", glow: "0 0 12px rgba(251,191,36,0.25)" }
+        : { label: "ARMOR STABLE · เกราะปกติ", color: "border-emerald-300/60 text-emerald-200", glow: "none" };
   const showHud = hud.status === "playing" || hud.status === "paused";
 
   return (
@@ -240,24 +240,13 @@ useEffect(() => {
           <div className="absolute left-4 bottom-4 w-[min(320px,44vw)] space-y-2">
             <div className="border border-red-300/35 bg-black/65 p-2">
               <div className="flex justify-between text-xs font-black tracking-wider text-red-200 mb-1">
-                <span>ARMOR · MARK 85</span>
+                <span>{hud.tonyExposed ? "TONY STARK · VITALS" : "ARMOR · MARK 85"}</span>
                 <span>{hud.playerHp}/{hud.playerMax}</span>
               </div>
-              <Bar value={hud.playerHp} max={hud.playerMax} color="linear-gradient(90deg,#dc2626,#f59e0b)" h="h-4" />
+              <Bar value={hud.playerHp} max={hud.playerMax} color={hud.tonyExposed ? "linear-gradient(90deg,#0891b2,#67e8f9)" : "linear-gradient(90deg,#dc2626,#f59e0b)"} h="h-4" />
               <div className={`mt-2 inline-flex items-center gap-2 border bg-black/65 px-2 py-1 text-[10px] font-black tracking-wide ${armorCondition.color}`} style={{ boxShadow: armorCondition.glow }}>
                 <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                 {armorCondition.label}
-              </div>
-            </div>
-            <div className="flex items-center justify-between border border-cyan-300/40 bg-slate-950/85 px-3 py-2">
-              <div>
-                <div className="text-xs font-black tracking-[0.18em] text-cyan-200">TONY · PILOT STATUS</div>
-                <div className={`mt-0.5 text-[10px] font-bold tracking-wider ${hud.tonyExposed ? "text-amber-200" : "text-emerald-200"}`}>
-                  {hud.tonyExposed ? "● TONY EXPOSED · SUIT OFFLINE" : "● VITALS NOMINAL"}
-                </div>
-              </div>
-              <div className={`rounded border px-2 py-1 text-[10px] font-black ${hud.tonyExposed ? "border-red-400/70 text-red-200" : "border-emerald-300/50 text-emerald-200"}`}>
-                {hud.tonyExposed ? "EXPOSED" : "ONLINE"}
               </div>
             </div>
             {!hud.tonyExposed && (
