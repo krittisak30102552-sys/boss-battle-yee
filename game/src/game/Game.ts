@@ -1284,7 +1284,7 @@ touchLook(dx: number, dy: number) {
     if (space && !p.spaceHeld && grounded) p.vel.y = 9;
     p.spaceHeld = space;
     if (p.boostEmpty && p.boost > 20) p.boostEmpty = false;
-    const thrust = space && p.boost > 0 && !p.boostEmpty;
+    const thrust = !this.armorDestroyed && space && p.boost > 0 && !p.boostEmpty;
     p.thrusting = thrust;
     if (thrust) {
       p.vel.y = Math.min(p.vel.y + 55 * dt, 10.5);
