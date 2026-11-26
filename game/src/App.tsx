@@ -6,6 +6,7 @@ const INITIAL: HudState = {
   status: "menu",
   playerHp: 250,
   playerMax: 250,
+  tonyExposed: false,
   bossHp: 3000,
   bossMax: 3000,
   boost: 100,
@@ -177,8 +178,10 @@ useEffect(() => {
 
     const bossPct = hud.bossHp / hud.bossMax;
   const armorRatio = hud.playerMax > 0 ? hud.playerHp / hud.playerMax : 1;
-  const armorCondition = armorRatio <= 0.2
-    ? { label: "CRITICAL DAMAGE · เกราะเสียหายหนัก", color: "border-red-400 text-red-200", glow: "0 0 16px rgba(248,113,113,0.45)" }
+  const armorCondition = hud.tonyExposed
+    ? { label: "ARMOR DESTROYED · เกราะแตกทั้งหมด", color: "border-red-400 text-red-200", glow: "0 0 18px rgba(248,113,113,0.6)" }
+    : armorRatio <= 0.2
+      ? { label: "CRITICAL DAMAGE · เกราะเสียหายหนัก", color: "border-red-400 text-red-200", glow: "0 0 16px rgba(248,113,113,0.45)" }
     : armorRatio <= 0.5
       ? { label: "ARMOR DAMAGED · เกราะเสียหาย", color: "border-amber-300 text-amber-200", glow: "0 0 12px rgba(251,191,36,0.25)" }
       : { label: "ARMOR STABLE · เกราะปกติ", color: "border-emerald-300/60 text-emerald-200", glow: "none" };
@@ -249,9 +252,13 @@ useEffect(() => {
             <div className="flex items-center justify-between border border-cyan-300/40 bg-slate-950/85 px-3 py-2">
               <div>
                 <div className="text-xs font-black tracking-[0.18em] text-cyan-200">TONY · PILOT STATUS</div>
-                <div className="mt-0.5 text-[10px] font-bold tracking-wider text-emerald-200">● VITALS NOMINAL</div>
+                <div className={`mt-0.5 text-[10px] font-bold tracking-wider ${hud.tonyExposed ? "text-amber-200" : "text-emerald-200"}`}>
+                  {hud.tonyExposed ? "● TONY EXPOSED · SUIT OFFLINE" : "● VITALS NOMINAL"}
+                </div>
               </div>
-              <div className="rounded border border-emerald-300/50 px-2 py-1 text-[10px] font-black text-emerald-200">ONLINE</div>
+              <div className={`rounded border px-2 py-1 text-[10px] font-black ${hud.tonyExposed ? "border-red-400/70 text-red-200" : "border-emerald-300/50 text-emerald-200"}`}>
+                {hud.tonyExposed ? "EXPOSED" : "ONLINE"}
+              </div>
             </div>
             <div>
               <div className="text-[10px] font-bold text-cyan-200 mb-1">THRUSTERS</div>
