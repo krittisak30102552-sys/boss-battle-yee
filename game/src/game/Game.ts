@@ -1305,6 +1305,11 @@ touchLook(dx: number, dy: number) {
     // heading follows the camera
     p.heading += angDiff(p.heading, this.camYaw) * Math.min(1, dt * 14);
     p.walk += Math.hypot(p.vel.x, p.vel.z) * dt * 0.75;
+    // Cosmetic armor scuffs only; combat values and behavior remain unchanged.
+    const armorRatio = p.hp / PLAYER_MAX;
+    this.rig.damageMarks.forEach((mark, index) => {
+      mark.visible = armorRatio <= (index < 2 ? 0.7 : 0.35);
+    });
   }
 
   private aimTarget(jitter = true): THREE.Vector3 {
