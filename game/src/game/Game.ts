@@ -734,7 +734,8 @@ private nano: NanoSystem;
     this.on(this.canvas, "contextmenu", (e: Event) => e.preventDefault());
     this.on(window, "mousemove", (e: MouseEvent) => {
       if (this.status !== "playing") return;
-      if (this.locked || this.rightDrag) {
+      const freeLook = this.keys.has("ControlLeft") || this.keys.has("ControlRight");
+      if (this.locked || this.rightDrag || freeLook) {
         this.camYaw -= e.movementX * 0.0024;
         this.camPitch = clamp(this.camPitch + e.movementY * 0.0022, -0.55, 1.15);
       }
