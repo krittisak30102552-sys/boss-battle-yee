@@ -233,20 +233,25 @@ useEffect(() => {
             )}
           </div>
 
-          {/* player status */}
+          {/* separate armor + Tony pilot status */}
           <div className="absolute left-4 bottom-4 w-[min(320px,44vw)] space-y-2">
-            <div>
-              <div className="flex justify-between text-xs font-bold text-red-200 mb-1">
-                <span>MARK 85 · NANOTECH</span>
-                <span>
-                  {hud.playerHp}/{hud.playerMax}
-                </span>
+            <div className="border border-red-300/35 bg-black/65 p-2">
+              <div className="flex justify-between text-xs font-black tracking-wider text-red-200 mb-1">
+                <span>ARMOR · MARK 85</span>
+                <span>{hud.playerHp}/{hud.playerMax}</span>
               </div>
               <Bar value={hud.playerHp} max={hud.playerMax} color="linear-gradient(90deg,#dc2626,#f59e0b)" h="h-4" />
+              <div className={`mt-2 inline-flex items-center gap-2 border bg-black/65 px-2 py-1 text-[10px] font-black tracking-wide ${armorCondition.color}`} style={{ boxShadow: armorCondition.glow }}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                {armorCondition.label}
+              </div>
             </div>
-            <div className={`mt-1 inline-flex items-center gap-2 border bg-black/65 px-2 py-1 text-[10px] font-black tracking-wide ${armorCondition.color}`} style={{ boxShadow: armorCondition.glow }}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-              {armorCondition.label}
+            <div className="flex items-center justify-between border border-cyan-300/40 bg-slate-950/85 px-3 py-2">
+              <div>
+                <div className="text-xs font-black tracking-[0.18em] text-cyan-200">TONY · PILOT STATUS</div>
+                <div className="mt-0.5 text-[10px] font-bold tracking-wider text-emerald-200">● VITALS NOMINAL</div>
+              </div>
+              <div className="rounded border border-emerald-300/50 px-2 py-1 text-[10px] font-black text-emerald-200">ONLINE</div>
             </div>
             <div>
               <div className="text-[10px] font-bold text-cyan-200 mb-1">THRUSTERS</div>
