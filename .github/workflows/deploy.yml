@@ -1086,9 +1086,9 @@ jobs:
           n = n.replace(
               chest_parent,
               '''      case "C":
-        return r.mountC;
-      case "BACK":
-        return r.mountBack;''',
+                  return r.mountC;
+                case "BACK":
+                  return r.mountBack;''',
               1,
           )
 
