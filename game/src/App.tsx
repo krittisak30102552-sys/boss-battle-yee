@@ -251,7 +251,7 @@ useEffect(() => {
               {hud.mark50Available && (
                 <button type="button" onClick={() => gameRef.current?.activateMark50()}
                   className="pointer-events-auto mt-3 w-full rounded-xl border-2 border-cyan-300 bg-cyan-500/20 px-4 py-3 text-sm font-black tracking-wider text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.35)] active:scale-95">
-                  ⚡ เรียก MARK 50 · แตะ Arc Reactor
+                  ⚡ เรียก MARK 50 · คลิก หรือกด M
                 </button>
               )}
               {hud.mark50Cinematic && (
