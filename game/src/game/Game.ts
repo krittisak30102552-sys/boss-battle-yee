@@ -932,6 +932,17 @@ touchLook(dx: number, dy: number) {
       this.updateProjectiles(dt);
       this.updateShocks(dt);
     }
+
+    // Keep the visual reveal in sync even on the frame Tony reaches zero HP.
+    const armorRatio = this.pl.hp / PLAYER_MAX;
+    this.rig.damageStages.forEach((stage, index) => {
+      stage.visible = armorRatio <= [0.82, 0.55, 0.28][index];
+    });
+    const tonyExposed = armorRatio <= 0.08;
+    this.rig.armorRoot.visible = !tonyExposed;
+    this.rig.tonyRoot.visible = tonyExposed;
+    this.rig.wreckage.visible = tonyExposed;
+
     this.updatePlayerPose(dt);
     this.suit.update(dt, this.time);
     this.updateBossPose(dt);
@@ -1309,16 +1320,7 @@ touchLook(dx: number, dy: number) {
     // heading follows the camera
     if (!this.freeLook) p.heading += angDiff(p.heading, this.camYaw) * Math.min(1, dt * 14);
     p.walk += Math.hypot(p.vel.x, p.vel.z) * dt * 0.75;
-    // Progressive visual-only armor damage: scuffs, fractures, then missing panels.
-    const armorRatio = p.hp / PLAYER_MAX;
-    this.rig.damageStages.forEach((stage, index) => {
-      stage.visible = armorRatio <= [0.82, 0.55, 0.28][index];
-    });
-    // At critical visual damage, the suit shell drops away and reveals Tony.
-    const tonyExposed = armorRatio <= 0.08;
-    this.rig.armorRoot.visible = !tonyExposed;
-    this.rig.tonyRoot.visible = tonyExposed;
-    this.rig.wreckage.visible = tonyExposed;
+    // Armor damage visuals are synchronized in the main loop, including the defeat frame.
   }
 
   private aimTarget(jitter = true): THREE.Vector3 {
