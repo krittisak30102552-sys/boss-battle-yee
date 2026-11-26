@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+}
+
+canvas {
+  outline: none;
+  touch-action: none;
+}
+
+@keyframes hurt-flash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.hurt-flash {
+  animation: hurt-flash 0.6s ease-out forwards;
+}
+
+@keyframes hit-marker {
+  0% {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+.hit-marker {
+  animation: hit-marker 0.25s ease-out forwards;
+}
