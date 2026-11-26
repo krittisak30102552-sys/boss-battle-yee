@@ -289,6 +289,7 @@ export class Game {
   private rightDrag = false;
   private locked = false;
   private wasLocked = false;
+  private freeLook = false;
 
   // camera
   private camYaw = 0;
@@ -699,6 +700,7 @@ private nano: NanoSystem;
       }
       this.keys.add(e.code);
       if (e.code === "KeyP") this.pause();
+      if (e.code === "KeyL") this.freeLook = !this.freeLook;
       const wi = WEAPON_INFO.findIndex((w) => w.code === e.code);
       if (wi >= 0) this.selectWeapon(wi);
       if (e.code === "KeyT") this.heal();
@@ -734,8 +736,7 @@ private nano: NanoSystem;
     this.on(this.canvas, "contextmenu", (e: Event) => e.preventDefault());
     this.on(window, "mousemove", (e: MouseEvent) => {
       if (this.status !== "playing") return;
-      const freeLook = this.keys.has("ControlLeft") || this.keys.has("ControlRight");
-      if (this.locked || this.rightDrag || freeLook) {
+      if (this.locked || this.rightDrag || this.freeLook) {
         this.camYaw -= e.movementX * 0.0024;
         this.camPitch = clamp(this.camPitch + e.movementY * 0.0022, -0.55, 1.15);
       }
@@ -1304,7 +1305,7 @@ touchLook(dx: number, dy: number) {
     }
 
     // heading follows the camera
-    p.heading += angDiff(p.heading, this.camYaw) * Math.min(1, dt * 14);
+    if (!this.freeLook) p.heading += angDiff(p.heading, this.camYaw) * Math.min(1, dt * 14);
     p.walk += Math.hypot(p.vel.x, p.vel.z) * dt * 0.75;
     // Cosmetic armor scuffs only; combat values and behavior remain unchanged.
     const armorRatio = p.hp / PLAYER_MAX;
