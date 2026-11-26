@@ -809,6 +809,19 @@ private nano: NanoSystem;
     this.mouseDown = false;
     this.pl.vel.set(0, 0, 0);
     this.pl.pos.y = 0;
+    // Pause the boss cleanly: remove already-launched hostile effects during the suit-up scene.
+    for (const projectile of this.projs) {
+      if (projectile.owner === "b") projectile.mesh.removeFromParent();
+    }
+    this.projs = this.projs.filter((projectile) => projectile.owner !== "b");
+    for (const shock of this.shocks) this.removeShock(shock);
+    this.shocks = [];
+    for (const meteor of this.meteors) this.removeMeteor(meteor);
+    this.meteors = [];
+    this.boss.state = "idle";
+    this.boss.t = 0;
+    this.boss.think = 2.2;
+    this.boss.lunge = 0;
     this.armorModel = 50;
     this.applyArmorModel();
     this.suit.summonForTony();
