@@ -186,7 +186,7 @@ export interface IronRig {
   wings: WingFin[];
   wingGlow: THREE.Mesh[];
   reactorGlow: THREE.Mesh;
-  damageMarks: THREE.Mesh[];
+  damageStages: THREE.Group[];
 }
 
 export const RED = 0xd01c28;
@@ -249,13 +249,59 @@ export function buildIronMan(): IronRig {
   chest.castShadow = false;
   const reactorGlow = part(body, new THREE.CircleGeometry(0.05, 18), 0xffffff, 0, 0.552, 0.276, { emissive: 0xffffff, ei: 3, metal: 0 });
   reactorGlow.castShadow = false;
-  // Cosmetic armor scuffs, revealed as the player's HP drops.
-  const damageMarks: THREE.Mesh[] = [];
-  damageMarks.push(boxR(body, 0.16, 0.018, 0.012, 0x29242a, 0.16, 0.69, 0.292, { rz: -0.55 }, { metal: 0.25, rough: 0.9 }));
-  damageMarks.push(boxR(body, 0.12, 0.014, 0.012, 0x29242a, -0.18, 0.53, 0.292, { rz: 0.7 }, { metal: 0.25, rough: 0.9 }));
-  damageMarks.push(boxR(body, 0.19, 0.022, 0.014, 0x29242a, 0.25, 0.72, 0.19, { rz: -0.8 }, { metal: 0.25, rough: 0.9 }));
-  damageMarks.push(boxR(body, 0.14, 0.018, 0.014, 0x29242a, -0.25, 0.72, 0.19, { rz: 0.8 }, { metal: 0.25, rough: 0.9 }));
-  damageMarks.forEach((mark) => { mark.visible = false; mark.castShadow = false; });
+  // Progressive cosmetic battle damage: paint scuffs, fractures, then missing armor panels.
+  const damageStages: THREE.Group[] = [];
+  const lightDamage = new THREE.Group();
+  body.add(lightDamage);
+  const scratchDark = 0x29242a;
+  const bareMetal = 0xb7c0c8;
+  const paintDust = 0x8b3438;
+  const scratch = (parent: THREE.Object3D, x: number, y: number, z: number, w: number, rz: number, color = scratchDark) => {
+    const mark = boxR(parent, w, 0.012, 0.009, color, x, y, z, { rz }, { metal: 0.2, rough: 0.95 });
+    mark.castShadow = false;
+  };
+  [
+    [0.16,0.69,0.296,0.16,-0.55],[-0.18,0.53,0.296,0.12,0.7],
+    [0.25,0.72,0.205,0.19,-0.8],[-0.25,0.72,0.205,0.14,0.8],
+    [0.02,0.39,0.25,0.13,-0.25],[-0.31,0.62,0.25,0.11,0.35],
+    [0.38,0.54,0.19,0.12,-0.9],[-0.39,0.48,0.19,0.15,0.65],
+    [0.08,0.82,0.21,0.09,0.4],[-0.08,0.82,0.21,0.12,-0.5],
+    [0.2,0.58,0.296,0.08,0.9],[-0.05,0.65,0.298,0.07,-0.7],
+  ].forEach(([x,y,z,w,rz]) => scratch(lightDamage,x,y,z,w,rz));
+  scratch(lightDamage,0.17,0.685,0.302,0.095,-0.55,bareMetal);
+  scratch(lightDamage,-0.19,0.525,0.302,0.07,0.7,bareMetal);
+  scratch(lightDamage,0.26,0.715,0.212,0.11,-0.8,paintDust);
+  lightDamage.visible = false;
+
+  const crackedDamage = new THREE.Group();
+  body.add(crackedDamage);
+  const crack = (pts: Array<[number,number]>, z: number) => {
+    const mesh = part(crackedDamage, polyGeo(pts, 0.012), 0x17191d, 0, 0, z, { metal: 0.25, rough: 0.95 });
+    mesh.castShadow = false;
+  };
+  crack([[0.02,0.78],[0.07,0.72],[0.045,0.68],[0.11,0.63],[0.08,0.58],[0.14,0.53],[0.1,0.49]],0.303);
+  crack([[-0.22,0.77],[-0.17,0.71],[-0.2,0.67],[-0.12,0.62],[-0.15,0.57]],0.303);
+  crack([[0.3,0.76],[0.25,0.7],[0.29,0.66],[0.22,0.61],[0.25,0.57]],0.23);
+  crack([[-0.31,0.58],[-0.26,0.55],[-0.29,0.5],[-0.21,0.46]],0.23);
+  scratch(crackedDamage,0.075,0.69,0.311,0.12,-0.9,bareMetal);
+  scratch(crackedDamage,-0.17,0.69,0.311,0.09,0.8,bareMetal);
+  crackedDamage.visible = false;
+
+  const severeDamage = new THREE.Group();
+  body.add(severeDamage);
+  const hole = part(severeDamage, polyGeo([[-0.13,0.13],[0.02,0.18],[0.12,0.1],[0.1,-0.02],[0.02,-0.1],[-0.1,-0.06]],0.018), 0x171b22, -0.22, 0.57, 0.305, { metal: 0.35, rough: 0.9 });
+  hole.castShadow = false;
+  const inner = part(severeDamage, polyGeo([[-0.07,0.08],[0.02,0.1],[0.07,0.02],[0.01,-0.06],[-0.06,-0.03]],0.02), 0x89949e, -0.22, 0.57, 0.318, { metal: 0.8, rough: 0.45 });
+  inner.castShadow = false;
+  const hole2 = part(severeDamage, polyGeo([[-0.09,0.1],[0.08,0.12],[0.12,0.02],[0.04,-0.09],[-0.08,-0.05]],0.018), 0x171b22, 0.25, 0.69, 0.22, { metal: 0.35, rough: 0.9 });
+  hole2.castShadow = false;
+  const inner2 = part(severeDamage, polyGeo([[-0.05,0.06],[0.05,0.07],[0.07,0],[-0.02,-0.05]],0.02), 0x89949e, 0.25, 0.69, 0.233, { metal: 0.8, rough: 0.45 });
+  inner2.castShadow = false;
+  const shard1 = part(severeDamage, polyGeo([[0,0.08],[0.13,0.02],[0.08,-0.1],[-0.02,-0.03]],0.045), RED, 0.42, 0.57, 0.22, { rz: -0.45, metal: 0.45, rough: 0.38 });
+  const shard2 = part(severeDamage, polyGeo([[0,0.06],[0.1,0.02],[0.03,-0.08],[-0.04,-0.02]],0.04), GOLD, -0.48, 0.73, 0.18, { rz: 0.6, metal: 0.45, rough: 0.38 });
+  shard1.castShadow = shard2.castShadow = false;
+  severeDamage.visible = false;
+  damageStages.push(lightDamage, crackedDamage, severeDamage);
 
   /* ---------------- back plating + nano frame ---------------- */
   box(body, 0.52, 0.5, 0.1, GOLD, 0, 0.54, -0.26, G);
@@ -391,7 +437,7 @@ export function buildIronMan(): IronRig {
     wings,
     wingGlow,
     reactorGlow,
-    damageMarks,
+    damageStages,
   };
 }
 
