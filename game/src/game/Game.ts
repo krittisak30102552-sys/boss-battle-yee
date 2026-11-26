@@ -18,6 +18,7 @@ export interface HudState {
   status: Status;
   playerHp: number;
   playerMax: number;
+  tonyExposed: boolean;
   bossHp: number;
   bossMax: number;
   boost: number;
@@ -977,6 +978,7 @@ touchLook(dx: number, dy: number) {
       status: this.status,
       playerHp: Math.max(0, Math.ceil(this.pl.hp)),
       playerMax: PLAYER_MAX,
+      tonyExposed: this.pl.hp / PLAYER_MAX <= 0.08,
       bossHp: Math.max(0, Math.ceil(b.hp)),
       bossMax: BOSS_MAX,
       boost: this.pl.boost,
@@ -1312,6 +1314,11 @@ touchLook(dx: number, dy: number) {
     this.rig.damageStages.forEach((stage, index) => {
       stage.visible = armorRatio <= [0.82, 0.55, 0.28][index];
     });
+    // At critical visual damage, the suit shell drops away and reveals Tony.
+    const tonyExposed = armorRatio <= 0.08;
+    this.rig.armorRoot.visible = !tonyExposed;
+    this.rig.tonyRoot.visible = tonyExposed;
+    this.rig.wreckage.visible = tonyExposed;
   }
 
   private aimTarget(jitter = true): THREE.Vector3 {
