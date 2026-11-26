@@ -160,6 +160,9 @@ export interface WingFin {
 
 export interface IronRig {
   root: THREE.Group;
+  armorRoot: THREE.Group;
+  tonyRoot: THREE.Group;
+  wreckage: THREE.Group;
   body: THREE.Group;
   head: THREE.Group;
   chest: THREE.Mesh;
@@ -199,17 +202,19 @@ void DARKRED;
 
 export function buildIronMan(): IronRig {
   const root = new THREE.Group();
-  const body = pivot(root, 0, 1.0, 0);
+  const armorRoot = new THREE.Group();
+  root.add(armorRoot);
+  const body = pivot(armorRoot, 0, 1.0, 0);
   const R = { metal: 0.38, rough: 0.34 }; // candy red
   const G = { metal: 0.42, rough: 0.32 }; // gold
   const S = { metal: 0.6, rough: 0.4 }; // silver
 
   /* ---------------- pelvis ---------------- */
-  box(root, 0.62, 0.2, 0.38, RED, 0, 0.99, 0, R);
-  box(root, 0.66, 0.045, 0.4, GOLD, 0, 1.1, 0, G);
-  box(root, 0.2, 0.17, 0.05, GOLD, 0, 0.97, 0.2, G);
-  boxR(root, 0.1, 0.2, 0.34, RED, 0.34, 0.97, 0, { rz: -0.2 }, R);
-  boxR(root, 0.1, 0.2, 0.34, RED, -0.34, 0.97, 0, { rz: 0.2 }, R);
+  box(armorRoot, 0.62, 0.2, 0.38, RED, 0, 0.99, 0, R);
+  box(armorRoot, 0.66, 0.045, 0.4, GOLD, 0, 1.1, 0, G);
+  box(armorRoot, 0.2, 0.17, 0.05, GOLD, 0, 0.97, 0.2, G);
+  boxR(armorRoot, 0.1, 0.2, 0.34, RED, 0.34, 0.97, 0, { rz: -0.2 }, R);
+  boxR(armorRoot, 0.1, 0.2, 0.34, RED, -0.34, 0.97, 0, { rz: 0.2 }, R);
 
   /* ---------------- abdomen: gold slats over a dark core ---------------- */
   box(body, 0.36, 0.34, 0.26, GUN, 0, 0.14, 0, S);
@@ -381,7 +386,7 @@ export function buildIronMan(): IronRig {
   const flameGeo = new THREE.ConeGeometry(0.11, 0.8, 8);
   flameGeo.rotateX(Math.PI);
   const makeLeg = (side: number) => {
-    const hip = pivot(root, side * 0.2, 1.0, 0);
+    const hip = pivot(armorRoot, side * 0.2, 1.0, 0);
     part(hip, new THREE.SphereGeometry(0.1, 10, 8), SILVER, 0, -0.02, 0, S);
     // thigh: gold with a red outer plate
     box(hip, 0.26, 0.5, 0.28, GOLD, 0, -0.27, 0, G);
@@ -411,8 +416,71 @@ export function buildIronMan(): IronRig {
   const lR = makeLeg(-1);
   const lL = makeLeg(1);
 
+  // Tony Stark pilot model, revealed only when the armor is almost completely gone.
+  const tonyRoot = new THREE.Group();
+  tonyRoot.visible = false;
+  root.add(tonyRoot);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xc88762, roughness: 0.82 });
+  const hair = new THREE.MeshStandardMaterial({ color: 0x241a18, roughness: 0.9 });
+  const shirt = new THREE.MeshStandardMaterial({ color: 0x252b35, roughness: 0.88 });
+  const pants = new THREE.MeshStandardMaterial({ color: 0x171b23, roughness: 0.9 });
+  const shoes = new THREE.MeshStandardMaterial({ color: 0x101318, roughness: 0.92 });
+  const beard = new THREE.MeshStandardMaterial({ color: 0x342522, roughness: 1 });
+  const eye = new THREE.MeshStandardMaterial({ color: 0x17191d, roughness: 0.8 });
+  const addTonyMesh = (geo: THREE.BufferGeometry, mat: THREE.Material, pos: [number,number,number], scale?: [number,number,number], rotZ = 0) => {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(...pos);
+    if (scale) mesh.scale.set(...scale);
+    mesh.rotation.z = rotZ;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    tonyRoot.add(mesh);
+    return mesh;
+  };
+  addTonyMesh(new THREE.BoxGeometry(0.56,0.68,0.31), shirt, [0,1.52,0]);
+  addTonyMesh(new THREE.BoxGeometry(0.5,0.25,0.3), pants, [0,1.05,0]);
+  addTonyMesh(new THREE.BoxGeometry(0.52,0.035,0.32), shoes, [0,1.16,0]);
+  for (const side of [-1,1]) {
+    addTonyMesh(new THREE.CylinderGeometry(0.105,0.12,0.52,10), shirt, [side*0.39,1.52,0], [1,1,1], side*-0.12);
+    addTonyMesh(new THREE.CylinderGeometry(0.085,0.095,0.42,10), skin, [side*0.45,1.12,0.015], [1,1,1], side*-0.08);
+    addTonyMesh(new THREE.SphereGeometry(0.09,12,10), skin, [side*0.45,0.89,0.02], [1,0.8,0.8]);
+    addTonyMesh(new THREE.BoxGeometry(0.22,0.62,0.25), pants, [side*0.15,0.67,0]);
+    addTonyMesh(new THREE.BoxGeometry(0.24,0.13,0.38), shoes, [side*0.15,0.12,0.07]);
+  }
+  addTonyMesh(new THREE.CylinderGeometry(0.075,0.08,0.16,12), skin, [0,1.91,0]);
+  addTonyMesh(new THREE.SphereGeometry(0.18,18,14), skin, [0,2.17,0.015], [0.92,1.12,0.9]);
+  addTonyMesh(new THREE.SphereGeometry(0.185,16,12), hair, [0,2.29,-0.015], [1,0.62,0.95]);
+  addTonyMesh(new THREE.SphereGeometry(0.125,14,10), beard, [0,2.055,0.12], [1,0.5,0.35]);
+  for (const side of [-1,1]) {
+    addTonyMesh(new THREE.SphereGeometry(0.018,8,8), eye, [side*0.065,2.2,0.171]);
+    addTonyMesh(new THREE.SphereGeometry(0.035,8,8), skin, [side*0.18,2.16,0]);
+  }
+
+  // A few detached red/gold armor fragments remain around Tony for the destroyed-suit reveal.
+  const wreckage = new THREE.Group();
+  wreckage.visible = false;
+  root.add(wreckage);
+  const redShard = new THREE.MeshStandardMaterial({ color: RED, metalness: 0.55, roughness: 0.35 });
+  const goldShard = new THREE.MeshStandardMaterial({ color: GOLD, metalness: 0.55, roughness: 0.35 });
+  const addShard = (size: [number,number,number], pos: [number,number,number], rot: [number,number,number], mat: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+    mesh.position.set(...pos);
+    mesh.rotation.set(...rot);
+    mesh.castShadow = true;
+    wreckage.add(mesh);
+  };
+  addShard([0.34,0.12,0.22],[-0.52,1.91,0.02],[0.2,0.1,-0.35],goldShard);
+  addShard([0.34,0.12,0.22],[0.52,1.91,0.02],[-0.2,-0.1,0.35],goldShard);
+  addShard([0.24,0.1,0.16],[-0.37,1.5,0.2],[0.3,0.2,0.55],redShard);
+  addShard([0.24,0.1,0.16],[0.37,1.48,0.2],[-0.3,-0.2,-0.55],redShard);
+  addShard([0.22,0.1,0.2],[-0.2,0.43,0.02],[0.2,0.3,-0.2],redShard);
+  addShard([0.22,0.1,0.2],[0.2,0.4,0.02],[-0.2,-0.3,0.2],goldShard);
+
   return {
     root,
+    armorRoot,
+    tonyRoot,
+    wreckage,
     body,
     head,
     chest,
@@ -427,7 +495,7 @@ export function buildIronMan(): IronRig {
     hipL: lL.hip,
     kneeL: lL.knee,
     flames,
-    mats: collectMats(root),
+    mats: collectMats(armorRoot),
     mountC,
     mountBack,
     mountSR,
