@@ -722,6 +722,7 @@ private nano: NanoSystem;
       }
       this.keys.add(e.code);
       if (e.code === "KeyP") this.pause();
+      if (e.code === "KeyM" && this.armorDestroyed) this.activateMark50();
       if (e.code === "KeyL") this.freeLook = !this.freeLook;
       const wi = WEAPON_INFO.findIndex((w) => w.code === e.code);
       if (wi >= 0 && !this.armorDestroyed) this.selectWeapon(wi);
@@ -769,7 +770,7 @@ private nano: NanoSystem;
     });
     this.on(document, "pointerlockchange", () => {
       this.locked = document.pointerLockElement === this.canvas;
-      if (!this.locked && this.wasLocked && this.status === "playing") this.pause();
+      if (!this.locked && this.wasLocked && this.status === "playing" && !this.armorDestroyed) this.pause();
       this.wasLocked = this.locked;
       this.emitHud(true);
     });
@@ -1019,6 +1020,8 @@ touchLook(dx: number, dy: number) {
     });
     if (armorRatio <= 0.08 && !this.armorDestroyed) {
       this.armorDestroyed = true;
+      // Release pointer lock so the emergency Mark 50 HUD button can receive clicks.
+      if (document.pointerLockElement === this.canvas) document.exitPointerLock();
       this.tonyHp = TONY_MAX;
       this.mouseDown = false;
       this.keys.clear();
