@@ -69,7 +69,7 @@ export interface WeaponInfo {
 export const WEAPON_INFO: WeaponInfo[] = [
   { key: "1", code: "Digit1", name: "REPULSORS", th: "เรพัลเซอร์", short: "เรพัลเซอร์", desc: "ลำแสงเรพัลเซอร์ที่ฝ่ามือ ยิงรัวระยะไกล (เท้าช่วยพยุงตัวตอนบิน)" },
   { key: "2", code: "Digit2", name: "LIGHTNING REFOCUS", th: "ดูดพลังงาน", short: "ดูดพลัง", desc: "กดค้าง: ปีกนาโนด้านหลังดูดลูกพลังงาน/คลื่นช็อก/ลำแสงธานอส — ปล่อยเพื่อยิงลำแสงสะท้อนกลับ" },
-  { key: "3", code: "Digit3", name: "UNI-BEAM", th: "ยูนิบีม", short: "ยูนิบีม", desc: "กดค้างยิงลำแสงจากเตาอาร์คกลางอก — ลอยกลางอากาศจะยิงยูนิบีมที่เท้าเพิ่ม" },
+  { key: "3", code: "Digit3", name: "UNI-BEAM", th: "ยูนิบีม", short: "ยูนิบีม", desc: "เอฟเฟกต์ยูนิบีมจากเตาอาร์คกลางอก" },
   { key: "4", code: "Digit4", name: "NANO / ZERO CANNON", th: "ปืนใหญ่นาโน", short: "ปืนใหญ่", desc: "กดค้างชาร์จ ปล่อยเพื่อยิง — ชาร์จเต็มจะยิง Zero Cannon จากไหล่พร้อมกัน" },
   { key: "5", code: "Digit5", name: "DISPLACER SENTRIES", th: "ป้อมปืนพลังงาน", short: "ป้อมปืน", desc: "คลิกเพื่อสร้างป้อมปืนนาโนลอยตัวยิงอัตโนมัติ (สูงสุด 3 ป้อม)" },
   { key: "6", code: "Digit6", name: "ENERGY BLADE", th: "ใบมีดพลังงาน", short: "ใบมีด", desc: "ฟันเสี้ยวพลังงาน + ใบมีดนาโนที่มือ ปัดลูกพลังงานกลับ" },
@@ -320,7 +320,6 @@ export class Game {
   private rings: Ring[] = [];
   private flashes: Flash[] = [];
   private uniBeam: THREE.Mesh;
-  private footBeams: THREE.Mesh[] = [];
   private bossBeam: THREE.Mesh;
   private snapCount = 0;
   private hint = "";
@@ -491,7 +490,6 @@ private nano: NanoSystem;
       return m;
     };
     this.uniBeam = mkBeam(new THREE.Color(1.2, 2.4, 3.0), 0.92);
-    this.footBeams = [mkBeam(new THREE.Color(1.2, 2.2, 3.0), 0.85), mkBeam(new THREE.Color(1.2, 2.2, 3.0), 0.85)];
     this.bossBeam = mkBeam(new THREE.Color(2.2, 0.8, 3.0), 0.85);
 
     this.bindInput();
@@ -892,7 +890,6 @@ touchLook(dx: number, dy: number) {
     for (const f of this.flashes) this.removeFlash(f);
     this.flashes = [];
     this.uniBeam.visible = false;
-    for (const fb of this.footBeams) fb.visible = false;
     this.bossBeam.visible = false;
     Object.assign(p, {
       absorbing: false, refocus: 0, heat: 0, overheat: false, uniOn: false, uniTick: 0, ult: 0, channel: 0,
@@ -2216,7 +2213,6 @@ private updatePlayerPose(dt: number) {
     const on = p.uniOn && playing && this.nano.current === W.UNI && this.nano.ready && !this.suit.active;
     if (!on) {
       this.uniBeam.visible = false;
-      for (const fb of this.footBeams) fb.visible = false;
     } else {
       this.rig.root.updateMatrixWorld(true);
       const wd = this.nano.weapon;
@@ -2241,14 +2237,6 @@ private updatePlayerPose(dt: number) {
       const pulse = 0.17 + Math.sin(this.time * 55) * 0.035;
       this.setBeam(this.uniBeam, from, end, pulse);
       const air = p.pos.y > 0.6;
-      this.footBeams.forEach((fb, i) => {
-        if (!air || !wd.extraMuzzles[i]) {
-          fb.visible = false;
-          return;
-        }
-        const ff = wd.extraMuzzles[i].getWorldPosition(this.tC);
-        this.setBeam(fb, ff, end, 0.075 + Math.sin(this.time * 60 + i) * 0.02);
-      });
       p.uniTick -= dt;
       if (p.uniTick <= 0) {
         p.uniTick = 0.1;
