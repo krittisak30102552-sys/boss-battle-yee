@@ -186,6 +186,7 @@ export interface IronRig {
   wings: WingFin[];
   wingGlow: THREE.Mesh[];
   reactorGlow: THREE.Mesh;
+  damageMarks: THREE.Mesh[];
 }
 
 export const RED = 0xd01c28;
@@ -248,6 +249,13 @@ export function buildIronMan(): IronRig {
   chest.castShadow = false;
   const reactorGlow = part(body, new THREE.CircleGeometry(0.05, 18), 0xffffff, 0, 0.552, 0.276, { emissive: 0xffffff, ei: 3, metal: 0 });
   reactorGlow.castShadow = false;
+  // Cosmetic armor scuffs, revealed as the player's HP drops.
+  const damageMarks: THREE.Mesh[] = [];
+  damageMarks.push(boxR(body, 0.16, 0.018, 0.012, 0x29242a, 0.16, 0.69, 0.292, { rz: -0.55 }, { metal: 0.25, rough: 0.9 }));
+  damageMarks.push(boxR(body, 0.12, 0.014, 0.012, 0x29242a, -0.18, 0.53, 0.292, { rz: 0.7 }, { metal: 0.25, rough: 0.9 }));
+  damageMarks.push(boxR(body, 0.19, 0.022, 0.014, 0x29242a, 0.25, 0.72, 0.19, { rz: -0.8 }, { metal: 0.25, rough: 0.9 }));
+  damageMarks.push(boxR(body, 0.14, 0.018, 0.014, 0x29242a, -0.25, 0.72, 0.19, { rz: 0.8 }, { metal: 0.25, rough: 0.9 }));
+  damageMarks.forEach((mark) => { mark.visible = false; mark.castShadow = false; });
 
   /* ---------------- back plating + nano frame ---------------- */
   box(body, 0.52, 0.5, 0.1, GOLD, 0, 0.54, -0.26, G);
@@ -383,6 +391,7 @@ export function buildIronMan(): IronRig {
     wings,
     wingGlow,
     reactorGlow,
+    damageMarks,
   };
 }
 
