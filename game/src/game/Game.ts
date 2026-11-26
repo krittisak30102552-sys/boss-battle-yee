@@ -1307,10 +1307,10 @@ touchLook(dx: number, dy: number) {
     // heading follows the camera
     if (!this.freeLook) p.heading += angDiff(p.heading, this.camYaw) * Math.min(1, dt * 14);
     p.walk += Math.hypot(p.vel.x, p.vel.z) * dt * 0.75;
-    // Cosmetic armor scuffs only; combat values and behavior remain unchanged.
+    // Progressive visual-only armor damage: scuffs, fractures, then missing panels.
     const armorRatio = p.hp / PLAYER_MAX;
-    this.rig.damageMarks.forEach((mark, index) => {
-      mark.visible = armorRatio <= (index < 2 ? 0.7 : 0.35);
+    this.rig.damageStages.forEach((stage, index) => {
+      stage.visible = armorRatio <= [0.82, 0.55, 0.28][index];
     });
   }
 
