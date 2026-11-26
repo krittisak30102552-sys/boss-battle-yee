@@ -950,8 +950,8 @@ touchLook(dx: number, dy: number) {
       this.tonyHp = TONY_MAX;
       this.mouseDown = false;
       this.keys.clear();
-      this.suit.toggle();
-      this.say("ARMOR EJECTED · TONY EXPOSED", 3.2);
+      this.suit.breakApart();
+      this.say("MARK 85 SHATTERED · TONY EXPOSED", 3.2);
     }
     // Once the armor has flown clear, leave Tony in the scene and retire the empty suit.
     if (this.armorDestroyed && this.suit.active && this.suit.mode === "none") {
