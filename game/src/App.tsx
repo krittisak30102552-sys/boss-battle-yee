@@ -69,7 +69,7 @@ function DownloadButtons({ compact = false }: { compact?: boolean }) {
 const KEYS: Array<[string, string]> = [
   ["W A S D", "เดิน"],
   ["เมาส์", "หมุนกล้อง / เล็ง"],
-  ["กดค้าง CTRL + ขยับเมาส์", "มองอิสระโดยไม่ล็อกเมาส์"],
+  ["L", "เปิด / ปิดมุมมองอิสระ"],
   ["คลิกซ้าย", "ใช้อาวุธ"],
   ["SPACE", "กระโดด / กดค้างเพื่อบิน"],
   ["SHIFT", "Dash หลบ (อมตะชั่วขณะ)"],
@@ -306,7 +306,7 @@ useEffect(() => {
 
           {hud.status === "playing" && !hud.locked && (
             <div className="absolute top-24 right-4 text-[11px] text-white/60 text-right max-w-[230px]">
-              กดค้าง CTRL แล้วขยับเมาส์เพื่อมองอิสระ · หรือกดลากเมาส์ขวา
+              กด L เปิด/ปิดมุมมองอิสระ · ขยับเมาส์เพื่อหมุนกล้อง
             </div>
           )}
         </div>
