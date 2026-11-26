@@ -383,27 +383,31 @@ export class SuitSystem {
     return this.active;
   }
 
-  /** Clear the shattered Mark 85 and launch the reserve Mark 50 toward Tony. */
+  /** Re-form the reserve Mark 50 from Tony's Arc Reactor using a nanotech stream. */
   summonForTony() {
     this.clearDebris();
     this.restorePieces();
     this.ctx.setWeaponHidden(true);
     this.assemblyMesh.visible = false;
     this.active = true;
-    this.mode = "approach";
+    // Start the armor around Tony; never fly a complete suit in from off-screen.
+    this.mode = "close";
     this.t = 0;
     this.summoning = true;
     const { pos, heading } = this.ctx.player();
     this.tony.root.visible = true;
     this.root.visible = true;
-    this.root.position.set(pos.x - 10, pos.y + 4.5, pos.z - 8);
+    this.root.position.copy(pos);
     this.root.rotation.set(0, heading, 0);
-    this.setFlames(true, 1);
+    this.setFlames(false, 0);
     for (const piece of this.pieces) {
       piece.released = false;
       piece.locked = false;
+      // Hold each plate as a small hovering fragment until the chest-originating
+      // nanotech stream reaches it and draws it into its final armor position.
+      this.place(piece, 1, 0, 0.35, 0);
     }
-    sfx.whoosh();
+    sfx.suitUnlock();
   }
 
   /** Break the armor apart around Tony and leave every plate on the ground. */
