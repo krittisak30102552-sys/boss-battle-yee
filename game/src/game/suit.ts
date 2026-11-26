@@ -720,7 +720,8 @@ export class SuitSystem {
     let allCovered = true;
     for (const p of this.pieces) {
       const chest = new THREE.Vector3(0, 1.55, 0.2);
-      const distance = p.base.distanceTo(chest);
+      const armorPoint = this.root.worldToLocal(p.mesh.getWorldPosition(this.tmp2));
+      const distance = armorPoint.distanceTo(chest);
       const delay = 0.08 + clamp01(distance / 2.65) * 1.05;
       const duration = 0.42 + (p.order < 0.12 ? 0.28 : 0);
       const u = clamp01((flowT - delay) / duration);
