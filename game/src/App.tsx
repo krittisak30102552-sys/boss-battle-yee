@@ -69,6 +69,7 @@ function DownloadButtons({ compact = false }: { compact?: boolean }) {
 const KEYS: Array<[string, string]> = [
   ["W A S D", "เดิน"],
   ["เมาส์", "หมุนกล้อง / เล็ง"],
+  ["กดค้าง CTRL + ขยับเมาส์", "มองอิสระโดยไม่ล็อกเมาส์"],
   ["คลิกซ้าย", "ใช้อาวุธ"],
   ["SPACE", "กระโดด / กดค้างเพื่อบิน"],
   ["SHIFT", "Dash หลบ (อมตะชั่วขณะ)"],
@@ -305,7 +306,7 @@ useEffect(() => {
 
           {hud.status === "playing" && !hud.locked && (
             <div className="absolute top-24 right-4 text-[11px] text-white/60 text-right max-w-[230px]">
-              คลิกบนเกมเพื่อล็อกเมาส์ — หรือกดลากเมาส์ขวาเพื่อหมุนกล้อง
+              กดค้าง CTRL แล้วขยับเมาส์เพื่อมองอิสระ · หรือกดลากเมาส์ขวา
             </div>
           )}
         </div>
@@ -370,6 +371,13 @@ useEffect(() => {
         </>
       )}
 
+
+      {showHud && hud.status === "playing" && (
+        <button type="button" onClick={() => gameRef.current?.pause()}
+          className="pointer-events-auto absolute left-4 top-4 z-[80] rounded-xl border border-amber-300/60 bg-slate-950/90 px-3 py-2 text-xs font-black text-amber-100 shadow-xl">
+          ⏸ หยุดเกม
+        </button>
+      )}
 
       {showHud && hud.status === "playing" && (
         <>
