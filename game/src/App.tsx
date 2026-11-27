@@ -103,6 +103,7 @@ export default function App() {
   const [mpBusy, setMpBusy] = useState(false);
   const [mpError, setMpError] = useState("");
   const [mpUid, setMpUid] = useState<string | undefined>(undefined);
+  const mpRoomRef = useRef<RoomInfo | null>(null);
     const [combatMode, setCombatMode] = useState<0 | 1>(0);
     const armorModel = hud.armorModel;
     const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
@@ -122,10 +123,24 @@ export default function App() {
   };
 
   useEffect(() => {
-    const offRoom = mp.onRoomUpdate((room) => { setMpRoom(room); });
+    const offRoom = mp.onRoomUpdate((room) => { mpRoomRef.current = room; setMpRoom(room); gameRef.current?.setRemotePlayers(room?.players ?? [], mpUid); });
     const offStart = mp.onStarted(() => launchMultiplayerGame());
     return () => { offRoom(); offStart(); mp.disconnect(); };
-  }, [mp]);
+  }, [mp, mpUid]);
+
+  // Multiplayer: continuously publish our position and apply every other pilot to this scene.
+  useEffect(() => {
+    const sync = () => {
+      const game = gameRef.current;
+      const room = mpRoomRef.current;
+      if (!game || !room || !mpUid || hud.status !== "playing") return;
+      game.setRemotePlayers(room.players, mpUid);
+      void mp.updateState(game.getNetworkState()).catch((e) => setMpError(e instanceof Error ? e.message : String(e)));
+    };
+    sync();
+    const timer = window.setInterval(sync, 100);
+    return () => window.clearInterval(timer);
+  }, [mp, mpUid, hud.status]);
 
   const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); setMpUid(mp.playerId); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
   const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); setMpUid(mp.playerId); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
@@ -532,12 +547,12 @@ useEffect(() => {
               </div>}
               {mpError && <p className="mt-2 text-xs text-red-300">{mpError}</p>}
             </div>
-            <button
+            {!mpRoom && <button
               onClick={() => { setChooseMode(false); setDeviceMode("desktop"); gameRef.current?.start(); }}
               className="mt-6 cursor-pointer px-12 py-4 text-xl font-black tracking-widest bg-gradient-to-b from-red-500 to-red-700 border-2 border-amber-300 hover:scale-105 active:scale-95 transition shadow-[0_0_30px_rgba(239,68,68,0.6)]"
             >
-              ▶ เริ่มเกม
-            </button>
+              ▶ เริ่มเกมเดี่ยว
+            </button>}
             <div className="mt-5">
     
             </div>
