@@ -21,6 +21,8 @@ const SERVER_URL = import.meta.env.VITE_MULTIPLAYER_URL as string | undefined;
 
 export class MultiplayerClient {
   private socket: Socket | null = null;
+  private roomCallbacks = new Set<(room: RoomInfo) => void>();
+  private startCallbacks = new Set<(data: { mode: RoomMode }) => void>();
 
   get configured() {
     return Boolean(SERVER_URL);
@@ -31,6 +33,8 @@ export class MultiplayerClient {
     if (this.socket?.connected) return Promise.resolve();
     this.socket?.disconnect();
     this.socket = io(SERVER_URL, { transports: ["websocket", "polling"], timeout: 8000 });
+    this.socket.on("room:update", (room: RoomInfo) => this.roomCallbacks.forEach((callback) => callback(room)));
+    this.socket.on("room:started", (data: { mode: RoomMode }) => this.startCallbacks.forEach((callback) => callback(data)));
     return new Promise((resolve, reject) => {
       const socket = this.socket!;
       const timer = window.setTimeout(() => reject(new Error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ")), 9000);
@@ -66,15 +70,17 @@ export class MultiplayerClient {
     this.socket?.emit("room:leave");
   }
   onRoomUpdate(callback: (room: RoomInfo) => void) {
-    this.socket?.on("room:update", callback);
-    return () => { this.socket?.off("room:update", callback); };
+    this.roomCallbacks.add(callback);
+    return () => { this.roomCallbacks.delete(callback); };
   }
   onStarted(callback: (data: { mode: RoomMode }) => void) {
-    this.socket?.on("room:started", callback);
-    return () => { this.socket?.off("room:started", callback); };
+    this.startCallbacks.add(callback);
+    return () => { this.startCallbacks.delete(callback); };
   }
   disconnect() {
     this.socket?.disconnect();
     this.socket = null;
+    this.roomCallbacks.clear();
+    this.startCallbacks.clear();
   }
 }
