@@ -36,6 +36,8 @@ jobs:
 
       - name: Build game
         working-directory: game
+        env:
+          VITE_MULTIPLAYER_URL: ${{ vars.VITE_MULTIPLAYER_URL }}
         run: npm run build
 
       - name: Configure Pages
