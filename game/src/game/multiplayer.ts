@@ -85,8 +85,13 @@ export class MultiplayerClient {
     // from a room that exists but cannot be joined.
     const existing = await get(roomRef);
     if (!existing.exists()) throw new Error(`ไม่พบห้องรหัส ${code} ในฐานข้อมูลนี้`);
+    // Firebase transactions may invoke the updater once with the local
+    // cache value (null) before the server value is available. Seed that
+    // first invocation from the server-confirmed get() result.
+    const serverRoom = existing.val();
     let reason = "เข้าห้องไม่สำเร็จ";
-    const result = await runTransaction(roomRef, room => {
+    const result = await runTransaction(roomRef, current => {
+      const room = current ?? serverRoom;
       if (!room) { reason = "ไม่พบห้องนี้"; return; }
       room.players ||= {};
       if (room.started) { reason = "ห้องเริ่มเกมแล้ว"; return; }
