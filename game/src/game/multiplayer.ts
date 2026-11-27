@@ -3,7 +3,8 @@ import { getAuth, signInAnonymously, type User } from "firebase/auth";
 import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, update, type Database } from "firebase/database";
 
 export type RoomMode = "coop" | "freeroam";
-export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }\nexport interface RoomPlayer { id: string; name: string; state: PlayerState | null; }
+export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }
+export interface RoomPlayer { id: string; name: string; state: PlayerState | null; }
 export interface RoomInfo { code: string; mode: RoomMode; hostId: string; players: RoomPlayer[]; started?: boolean; }
 
 const config = {
@@ -31,7 +32,8 @@ export class MultiplayerClient {
   private roomCallbacks = new Set<(room: RoomInfo) => void>();
   private startCallbacks = new Set<(data: { mode: RoomMode }) => void>();
   private wasStarted = false;
-  get configured() { return configured; }\n  get playerId() { return this.user?.uid; }
+  get configured() { return configured; }
+  get playerId() { return this.user?.uid; }
 
   async connect() {
     if (!auth || !db) throw new Error("ยังไม่ได้ตั้งค่า Firebase ตามขั้นตอนที่ให้ไว้");
@@ -106,7 +108,13 @@ export class MultiplayerClient {
     const players = Object.entries(raw.players || {}).map(([id, p]: [string, any]) => ({ id, name: p.name, state: null as null }));
     return { ok: true, room: { code, mode: raw.mode, hostId: raw.hostId, players, started: Boolean(raw.started) } };
   }
-  async updateState(state: PlayerState) {\n    const { db, uid } = this.require();\n    if (!this.code) return;\n    const clean: PlayerState = { x: Math.max(-60, Math.min(60, state.x)), y: Math.max(0, Math.min(30, state.y)), z: Math.max(-60, Math.min(60, state.z)), heading: Number.isFinite(state.heading) ? state.heading : 0, flying: Boolean(state.flying) };\n    await update(ref(db, `rooms/${this.code}/players/${uid}`), { state: clean });\n  }\n  async start(): Promise<{ ok: true }> {
+  async updateState(state: PlayerState) {
+    const { db, uid } = this.require();
+    if (!this.code) return;
+    const clean: PlayerState = { x: Math.max(-60, Math.min(60, state.x)), y: Math.max(0, Math.min(30, state.y)), z: Math.max(-60, Math.min(60, state.z)), heading: Number.isFinite(state.heading) ? state.heading : 0, flying: Boolean(state.flying) };
+    await update(ref(db, `rooms/${this.code}/players/${uid}`), { state: clean });
+  }
+  async start(): Promise<{ ok: true }> {
     const { db, uid } = this.require();
     if (!this.code) throw new Error("ยังไม่ได้อยู่ในห้อง");
     let reason = "เริ่มห้องไม่สำเร็จ";
