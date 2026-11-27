@@ -113,9 +113,16 @@ export default function App() {
     };
     
 
+  const launchMultiplayerGame = () => {
+    setMpError("");
+    setChooseMode(false);
+    setDeviceMode("desktop");
+    gameRef.current?.start();
+  };
+
   useEffect(() => {
     const offRoom = mp.onRoomUpdate(setMpRoom);
-    const offStart = mp.onStarted(() => setMpError("ห้องเริ่มแล้ว — รอเปิดระบบซิงก์ตัวละครในขั้นถัดไป"));
+    const offStart = mp.onStarted(() => launchMultiplayerGame());
     return () => { offRoom(); offStart(); mp.disconnect(); };
   }, [mp]);
 
