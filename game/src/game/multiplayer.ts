@@ -31,7 +31,7 @@ export class MultiplayerClient {
   private roomCallbacks = new Set<(room: RoomInfo) => void>();
   private startCallbacks = new Set<(data: { mode: RoomMode }) => void>();
   private wasStarted = false;
-  get configured() { return configured; }
+  get configured() { return configured; }\n  get playerId() { return this.user?.uid; }
 
   async connect() {
     if (!auth || !db) throw new Error("ยังไม่ได้ตั้งค่า Firebase ตามขั้นตอนที่ให้ไว้");
