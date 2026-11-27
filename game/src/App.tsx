@@ -128,7 +128,7 @@ export default function App() {
 
   const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
   const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
-  const startRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.start(); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const startRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.start(); launchMultiplayerGame(); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -526,7 +526,7 @@ useEffect(() => {
                 <div className="text-[10px] font-bold tracking-widest text-cyan-200">ROOM CODE</div><div className="my-1 text-3xl font-black tracking-[0.3em] text-white">{mpRoom.code}</div>
                 <div className="text-xs text-white/60">{mpRoom.mode === "coop" ? "CO-OP" : "FREE ROAM"} · {mpRoom.players.length}/4 คน</div>
                 <div className="mt-2 space-y-1">{mpRoom.players.map((p) => <div key={p.id} className="text-xs text-white/80">✦ {p.name}{p.id === mpRoom.hostId ? " · HOST" : ""}</div>)}</div>
-                <button disabled={mpBusy || mpRoom.hostId !== mpRoom.players[0]?.id} onClick={startRoom} className="mt-3 w-full rounded-lg border border-amber-300/60 bg-amber-500/15 px-3 py-2 text-xs font-black text-amber-100 disabled:opacity-40">▶ เริ่มห้อง (HOST)</button>
+                <button disabled={mpBusy} onClick={startRoom} className="mt-3 w-full rounded-lg border border-amber-300/60 bg-amber-500/15 px-3 py-2 text-xs font-black text-amber-100 disabled:opacity-40">▶ เริ่มห้อง (HOST)</button>
                 <button onClick={() => { mp.leave(); setMpRoom(null); }} className="mt-2 w-full rounded-lg bg-white/10 px-3 py-2 text-xs">ออกจากห้อง</button>
               </div>}
               {mpError && <p className="mt-2 text-xs text-red-300">{mpError}</p>}
