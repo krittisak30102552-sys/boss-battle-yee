@@ -126,8 +126,8 @@ export default function App() {
     return () => { offRoom(); offStart(); mp.disconnect(); };
   }, [mp]);
 
-  const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); setMpUid(r.room.players[0]?.id); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
-  const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); setMpUid(r.room.players.find(p => p.name === mpName)?.id); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); setMpUid(mp.playerId); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); setMpUid(mp.playerId); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
   const startRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.start(); launchMultiplayerGame(); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
 
   useEffect(() => {
