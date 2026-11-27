@@ -123,10 +123,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    const offRoom = mp.onRoomUpdate((room) => { mpRoomRef.current = room; setMpRoom(room); gameRef.current?.setRemotePlayers(room?.players ?? [], mpUid); });
+    const offRoom = mp.onRoomUpdate((room) => { mpRoomRef.current = room; setMpRoom(room); gameRef.current?.setRemotePlayers(room?.players ?? [], mp.playerId); });
     const offStart = mp.onStarted(() => launchMultiplayerGame());
     return () => { offRoom(); offStart(); mp.disconnect(); };
-  }, [mp, mpUid]);
+  }, [mp]);
 
   // Multiplayer: continuously publish our position and apply every other pilot to this scene.
   useEffect(() => {
