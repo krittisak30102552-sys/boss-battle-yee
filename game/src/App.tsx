@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Game, HudState, WEAPON_INFO } from "./game/Game";
 import { downloadSingleHtml, downloadSourceZip } from "./utils/download";
+import { MultiplayerClient, RoomInfo, RoomMode } from "./game/multiplayer";
 
 const INITIAL: HudState = {
   status: "menu",
@@ -94,6 +95,13 @@ export default function App() {
   const [chooseMode, setChooseMode] = useState(false);
   const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mp] = useState(() => new MultiplayerClient());
+  const [mpName, setMpName] = useState("IRON PILOT");
+  const [mpCode, setMpCode] = useState("");
+  const [mpRoom, setMpRoom] = useState<RoomInfo | null>(null);
+  const [mpMode, setMpMode] = useState<RoomMode>("coop");
+  const [mpBusy, setMpBusy] = useState(false);
+  const [mpError, setMpError] = useState("");
     const [combatMode, setCombatMode] = useState<0 | 1>(0);
     const armorModel = hud.armorModel;
     const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
@@ -104,6 +112,16 @@ export default function App() {
       gameRef.current?.selectSkill(next === 0 ? 0 : 6);
     };
     
+
+  useEffect(() => {
+    const offRoom = mp.onRoomUpdate(setMpRoom);
+    const offStart = mp.onStarted(() => setMpError("ห้องเริ่มแล้ว — รอเปิดระบบซิงก์ตัวละครในขั้นถัดไป"));
+    return () => { offRoom(); offStart(); mp.disconnect(); };
+  }, [mp]);
+
+  const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const startRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.start(); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -482,6 +500,30 @@ useEffect(() => {
               ))}
             </div>
 
+            <div className="mt-5 mx-auto max-w-xl border border-cyan-300/35 bg-slate-950/85 p-4 text-left">
+              <div className="text-sm font-black tracking-wider text-cyan-200">🌐 MULTIPLAYER · เล่นกับเพื่อน</div>
+              {!mp.configured && <p className="mt-2 text-xs text-amber-200/90">เซิร์ฟเวอร์กำลังรอตั้งค่า URL เพื่อเปิดใช้งาน</p>}
+              <label className="mt-3 block text-[11px] text-white/65">ชื่อนักบิน</label>
+              <input value={mpName} onChange={(e) => setMpName(e.target.value.slice(0,18))} maxLength={18} className="mt-1 w-full rounded-lg border border-white/20 bg-black/60 px-3 py-2 text-sm text-white" />
+              {!mpRoom ? <>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button onClick={() => setMpMode("coop")} className={`rounded-lg border p-2 text-xs font-bold ${mpMode === "coop" ? "border-amber-300 bg-amber-500/20 text-amber-100" : "border-white/20 bg-white/5"}`}>⚔️ CO-OP</button>
+                  <button onClick={() => setMpMode("freeroam")} className={`rounded-lg border p-2 text-xs font-bold ${mpMode === "freeroam" ? "border-cyan-300 bg-cyan-500/20 text-cyan-100" : "border-white/20 bg-white/5"}`}>🛫 FREE ROAM</button>
+                </div>
+                <button disabled={mpBusy || !mp.configured} onClick={createRoom} className="mt-3 w-full rounded-lg border border-cyan-300/60 bg-cyan-500/15 px-3 py-2.5 text-sm font-black text-cyan-100 disabled:opacity-40">＋ สร้างห้องใหม่</button>
+                <div className="mt-3 flex gap-2">
+                  <input value={mpCode} onChange={(e) => setMpCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6))} maxLength={6} placeholder="รหัสห้อง 6 ตัว" className="min-w-0 flex-1 rounded-lg border border-white/20 bg-black/60 px-3 py-2 text-sm uppercase tracking-[0.25em] text-white" />
+                  <button disabled={mpBusy || !mp.configured || mpCode.length !== 6} onClick={joinRoom} className="rounded-lg border border-amber-300/60 bg-amber-500/15 px-4 py-2 text-xs font-black text-amber-100 disabled:opacity-40">เข้าร่วม</button>
+                </div>
+              </> : <div className="mt-3 rounded-xl border border-cyan-300/30 bg-cyan-950/30 p-3">
+                <div className="text-[10px] font-bold tracking-widest text-cyan-200">ROOM CODE</div><div className="my-1 text-3xl font-black tracking-[0.3em] text-white">{mpRoom.code}</div>
+                <div className="text-xs text-white/60">{mpRoom.mode === "coop" ? "CO-OP" : "FREE ROAM"} · {mpRoom.players.length}/4 คน</div>
+                <div className="mt-2 space-y-1">{mpRoom.players.map((p) => <div key={p.id} className="text-xs text-white/80">✦ {p.name}{p.id === mpRoom.hostId ? " · HOST" : ""}</div>)}</div>
+                <button disabled={mpBusy || mpRoom.hostId !== mpRoom.players[0]?.id} onClick={startRoom} className="mt-3 w-full rounded-lg border border-amber-300/60 bg-amber-500/15 px-3 py-2 text-xs font-black text-amber-100 disabled:opacity-40">▶ เริ่มห้อง (HOST)</button>
+                <button onClick={() => { mp.leave(); setMpRoom(null); }} className="mt-2 w-full rounded-lg bg-white/10 px-3 py-2 text-xs">ออกจากห้อง</button>
+              </div>}
+              {mpError && <p className="mt-2 text-xs text-red-300">{mpError}</p>}
+            </div>
             <button
               onClick={() => { setChooseMode(false); setDeviceMode("desktop"); gameRef.current?.start(); }}
               className="mt-6 cursor-pointer px-12 py-4 text-xl font-black tracking-widest bg-gradient-to-b from-red-500 to-red-700 border-2 border-amber-300 hover:scale-105 active:scale-95 transition shadow-[0_0_30px_rgba(239,68,68,0.6)]"
