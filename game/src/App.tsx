@@ -101,7 +101,7 @@ export default function App() {
   const [mpRoom, setMpRoom] = useState<RoomInfo | null>(null);
   const [mpMode, setMpMode] = useState<RoomMode>("coop");
   const [mpBusy, setMpBusy] = useState(false);
-  const [mpError, setMpError] = useState("");
+  const [mpError, setMpError] = useState("");\n  const [mpUid, setMpUid] = useState<string | undefined>(undefined);
     const [combatMode, setCombatMode] = useState<0 | 1>(0);
     const armorModel = hud.armorModel;
     const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
@@ -121,13 +121,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    const offRoom = mp.onRoomUpdate(setMpRoom);
+    const offRoom = mp.onRoomUpdate((room) => { setMpRoom(room); });
     const offStart = mp.onStarted(() => launchMultiplayerGame());
     return () => { offRoom(); offStart(); mp.disconnect(); };
   }, [mp]);
 
-  const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
-  const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); setMpUid(r.room.players[0]?.id); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
+  const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); setMpUid(r.room.players.find(p => p.name === mpName)?.id); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
   const startRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.start(); launchMultiplayerGame(); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
 
   useEffect(() => {
