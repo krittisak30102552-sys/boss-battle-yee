@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, signInAnonymously, type User } from "firebase/auth";
-import { getDatabase, ref, onValue, runTransaction, onDisconnect, type Database } from "firebase/database";
+import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, type Database } from "firebase/database";
 
 export type RoomMode = "coop" | "freeroam";
 export interface RoomPlayer { id: string; name: string; state: null; }
@@ -80,8 +80,13 @@ export class MultiplayerClient {
     await this.leave();
     const code = input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
     if (code.length !== 6) throw new Error("กรอกรหัสห้อง 6 ตัว");
+    const roomRef = ref(db, `rooms/${code}`);
+    // Read the exact room path first so a missing path is distinguishable
+    // from a room that exists but cannot be joined.
+    const existing = await get(roomRef);
+    if (!existing.exists()) throw new Error(`ไม่พบห้องรหัส ${code} ในฐานข้อมูลนี้`);
     let reason = "เข้าห้องไม่สำเร็จ";
-    const result = await runTransaction(ref(db, `rooms/${code}`), room => {
+    const result = await runTransaction(roomRef, room => {
       if (!room) { reason = "ไม่พบห้องนี้"; return; }
       room.players ||= {};
       if (room.started) { reason = "ห้องเริ่มเกมแล้ว"; return; }
