@@ -7,11 +7,12 @@ export interface RoomPlayer { id: string; name: string; state: null; }
 export interface RoomInfo { code: string; mode: RoomMode; hostId: string; players: RoomPlayer[]; started?: boolean; }
 
 const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: String(import.meta.env.VITE_FIREBASE_API_KEY || "").trim().replace(/^["']|["']$/g, ""),
+  authDomain: String(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "").trim().replace(/^["']|["']$/g, ""),
+  // Use the exact Realtime Database endpoint created for this Firebase project.
+  databaseURL: "https://iron-man-game-413bd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: String(import.meta.env.VITE_FIREBASE_PROJECT_ID || "").trim().replace(/^["']|["']$/g, ""),
+  appId: String(import.meta.env.VITE_FIREBASE_APP_ID || "").trim().replace(/^["']|["']$/g, ""),
 };
 const configured = Boolean(config.apiKey && config.authDomain && config.databaseURL && config.projectId && config.appId);
 const app = configured ? (getApps()[0] ?? initializeApp(config)) : null;
