@@ -332,7 +332,8 @@ export class Game {
   private hintT = 0;
 
   // player
-  private rig: IronRig;\n  private remoteRigs = new Map<string, { rig: IronRig; target: THREE.Vector3; heading: number }>();
+  private rig: IronRig;
+  private remoteRigs = new Map<string, { rig: IronRig; target: THREE.Vector3; heading: number }>();
   private armorModel: 50 | 85 = 85;
   private mark85Colors: THREE.Color[] = [];
   private combatMode = 0;
@@ -800,7 +801,41 @@ private nano: NanoSystem;
   /* ---------------------------------------------------------------- */
 
 
-  getNetworkState() {\n    return { x: this.pl.pos.x, y: this.pl.pos.y, z: this.pl.pos.z, heading: this.pl.heading, flying: this.pl.pos.y > 0.15 };\n  }\n\n  setRemotePlayers(players: Array<{ id: string; name: string; state: { x: number; y: number; z: number; heading: number; flying?: boolean } | null }>, ownId?: string) {\n    const present = new Set(players.filter(p => p.id !== ownId && p.state).map(p => p.id));\n    for (const [id, remote] of this.remoteRigs) {\n      if (!present.has(id)) { this.scene.remove(remote.rig.root); this.remoteRigs.delete(id); }\n    }\n    for (const player of players) {\n      if (player.id === ownId || !player.state) continue;\n      const s = player.state;\n      if (![s.x,s.y,s.z,s.heading].every(Number.isFinite)) continue;\n      let remote = this.remoteRigs.get(player.id);\n      if (!remote) {\n        const rig = buildIronMan();\n        rig.root.scale.setScalar(0.92);\n        this.scene.add(rig.root);\n        remote = { rig, target: new THREE.Vector3(s.x,s.y,s.z), heading: s.heading };\n        this.remoteRigs.set(player.id, remote);\n      }\n      remote.target.set(THREE.MathUtils.clamp(s.x,-60,60), THREE.MathUtils.clamp(s.y,0,30), THREE.MathUtils.clamp(s.z,-60,60));\n      remote.heading = s.heading;\n    }\n  }\n\n  private updateRemotePlayers(dt: number) {\n    for (const remote of this.remoteRigs.values()) {\n      remote.rig.root.position.lerp(remote.target, 1 - Math.exp(-12 * dt));\n      const diff = ((remote.heading - remote.rig.root.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;\n      remote.rig.root.rotation.y += diff * (1 - Math.exp(-12 * dt));\n    }\n  }\n\n  getArmorModel() {
+  getNetworkState() {
+    return { x: this.pl.pos.x, y: this.pl.pos.y, z: this.pl.pos.z, heading: this.pl.heading, flying: this.pl.pos.y > 0.15 };
+  }
+
+  setRemotePlayers(players: Array<{ id: string; name: string; state: { x: number; y: number; z: number; heading: number; flying?: boolean } | null }>, ownId?: string) {
+    const present = new Set(players.filter(p => p.id !== ownId && p.state).map(p => p.id));
+    for (const [id, remote] of this.remoteRigs) {
+      if (!present.has(id)) { this.scene.remove(remote.rig.root); this.remoteRigs.delete(id); }
+    }
+    for (const player of players) {
+      if (player.id === ownId || !player.state) continue;
+      const s = player.state;
+      if (![s.x,s.y,s.z,s.heading].every(Number.isFinite)) continue;
+      let remote = this.remoteRigs.get(player.id);
+      if (!remote) {
+        const rig = buildIronMan();
+        rig.root.scale.setScalar(0.92);
+        this.scene.add(rig.root);
+        remote = { rig, target: new THREE.Vector3(s.x,s.y,s.z), heading: s.heading };
+        this.remoteRigs.set(player.id, remote);
+      }
+      remote.target.set(THREE.MathUtils.clamp(s.x,-60,60), THREE.MathUtils.clamp(s.y,0,30), THREE.MathUtils.clamp(s.z,-60,60));
+      remote.heading = s.heading;
+    }
+  }
+
+  private updateRemotePlayers(dt: number) {
+    for (const remote of this.remoteRigs.values()) {
+      remote.rig.root.position.lerp(remote.target, 1 - Math.exp(-12 * dt));
+      const diff = ((remote.heading - remote.rig.root.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      remote.rig.root.rotation.y += diff * (1 - Math.exp(-12 * dt));
+    }
+  }
+
+  getArmorModel() {
     return this.armorModel;
   }
 
@@ -907,7 +942,9 @@ touchLook(dx: number, dy: number) {
     this.ro.disconnect();
     for (const [t, ty, fn] of this.handlers) t.removeEventListener(ty, fn);
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
-    this.nano.dispose();\n    for (const remote of this.remoteRigs.values()) this.scene.remove(remote.rig.root);\n    this.remoteRigs.clear();
+    this.nano.dispose();
+    for (const remote of this.remoteRigs.values()) this.scene.remove(remote.rig.root);
+    this.remoteRigs.clear();
     this.renderer.dispose();
     this.canvas.remove();
   }
@@ -1044,7 +1081,8 @@ touchLook(dx: number, dy: number) {
       this.rig.root.visible = false;
     }
 
-    this.updatePlayerPose(dt);\n    this.updateRemotePlayers(dt);
+    this.updatePlayerPose(dt);
+    this.updateRemotePlayers(dt);
     this.suit.update(dt, this.time);
     this.updateBossPose(dt);
     this.updateCompanion(dt);
