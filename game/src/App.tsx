@@ -101,7 +101,8 @@ export default function App() {
   const [mpRoom, setMpRoom] = useState<RoomInfo | null>(null);
   const [mpMode, setMpMode] = useState<RoomMode>("coop");
   const [mpBusy, setMpBusy] = useState(false);
-  const [mpError, setMpError] = useState("");\n  const [mpUid, setMpUid] = useState<string | undefined>(undefined);
+  const [mpError, setMpError] = useState("");
+  const [mpUid, setMpUid] = useState<string | undefined>(undefined);
     const [combatMode, setCombatMode] = useState<0 | 1>(0);
     const armorModel = hud.armorModel;
     const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
