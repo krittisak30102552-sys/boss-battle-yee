@@ -1,86 +1,28 @@
-import { io, Socket } from "socket.io-client";
-
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth, signInAnonymously, type User } from "firebase/auth";
+import { getDatabase, ref, runTransaction, onValue, onDisconnect, type Database } from "firebase/database";
 export type RoomMode = "coop" | "freeroam";
-export interface RoomPlayer {
-  id: string;
-  name: string;
-  state: null | {
-    x: number; y: number; z: number; yaw: number; pitch: number;
-    flying: boolean; armor: 50 | 85; exposed: boolean;
-  };
-}
-export interface RoomInfo {
-  code: string;
-  mode: RoomMode;
-  hostId: string;
-  players: RoomPlayer[];
-}
-type Ack<T> = (value: T) => void;
-
-const SERVER_URL = import.meta.env.VITE_MULTIPLAYER_URL as string | undefined;
-
+export interface RoomPlayer { id: string; name: string; state: null | { x:number;y:number;z:number;yaw:number;pitch:number;flying:boolean;armor:50|85;exposed:boolean }; }
+export interface RoomInfo { code:string;mode:RoomMode;hostId:string;players:RoomPlayer[];started?:boolean; }
+const cfg={apiKey:import.meta.env.VITE_FIREBASE_API_KEY,authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,databaseURL:import.meta.env.VITE_FIREBASE_DATABASE_URL,projectId:import.meta.env.VITE_FIREBASE_PROJECT_ID,appId:import.meta.env.VITE_FIREBASE_APP_ID};
+const configured=Boolean(cfg.apiKey&&cfg.authDomain&&cfg.databaseURL&&cfg.projectId&&cfg.appId);
+const app=configured?(getApps()[0]??initializeApp(cfg)):null;
+const auth=app?getAuth(app):null;
+const db:Database|null=app?getDatabase(app):null;
+const cleanName=(v:string)=>String(v||"IRON PILOT").replace(/[<>\u0000-\u001f]/g,"").trim().slice(0,18)||"IRON PILOT";
+const makeCode=()=>{const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s;};
 export class MultiplayerClient {
-  private socket: Socket | null = null;
-  private roomCallbacks = new Set<(room: RoomInfo) => void>();
-  private startCallbacks = new Set<(data: { mode: RoomMode }) => void>();
-
-  get configured() {
-    return Boolean(SERVER_URL);
-  }
-
-  connect(): Promise<void> {
-    if (!SERVER_URL) return Promise.reject(new Error("ยังไม่ได้ตั้งค่า VITE_MULTIPLAYER_URL"));
-    if (this.socket?.connected) return Promise.resolve();
-    this.socket?.disconnect();
-    this.socket = io(SERVER_URL, { transports: ["websocket", "polling"], timeout: 8000 });
-    this.socket.on("room:update", (room: RoomInfo) => this.roomCallbacks.forEach((callback) => callback(room)));
-    this.socket.on("room:started", (data: { mode: RoomMode }) => this.startCallbacks.forEach((callback) => callback(data)));
-    return new Promise((resolve, reject) => {
-      const socket = this.socket!;
-      const timer = window.setTimeout(() => reject(new Error("เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ")), 9000);
-      socket.once("connect", () => { window.clearTimeout(timer); resolve(); });
-      socket.once("connect_error", (error) => { window.clearTimeout(timer); reject(error); });
-    });
-  }
-
-  private request<T>(event: string, payload?: unknown): Promise<T> {
-    return new Promise((resolve, reject) => {
-      if (!this.socket?.connected) return reject(new Error("ยังไม่ได้เชื่อมต่อ"));
-      const timer = window.setTimeout(() => reject(new Error("เซิร์ฟเวอร์ไม่ตอบสนอง")), 8000);
-      const ack: Ack<T & { ok?: boolean; error?: string }> = (result) => {
-        window.clearTimeout(timer);
-        if (result && result.ok === false) reject(new Error(result.error || "ทำรายการไม่สำเร็จ"));
-        else resolve(result);
-      };
-      if (payload === undefined) this.socket.emit(event, ack);
-      else this.socket.emit(event, payload, ack);
-    });
-  }
-
-  create(name: string, mode: RoomMode) {
-    return this.request<{ ok: true; room: RoomInfo }>("room:create", { name, mode });
-  }
-  join(name: string, code: string) {
-    return this.request<{ ok: true; room: RoomInfo }>("room:join", { name, code });
-  }
-  start() {
-    return this.request<{ ok: true }>("room:start");
-  }
-  leave() {
-    this.socket?.emit("room:leave");
-  }
-  onRoomUpdate(callback: (room: RoomInfo) => void) {
-    this.roomCallbacks.add(callback);
-    return () => { this.roomCallbacks.delete(callback); };
-  }
-  onStarted(callback: (data: { mode: RoomMode }) => void) {
-    this.startCallbacks.add(callback);
-    return () => { this.startCallbacks.delete(callback); };
-  }
-  disconnect() {
-    this.socket?.disconnect();
-    this.socket = null;
-    this.roomCallbacks.clear();
-    this.startCallbacks.clear();
-  }
+ private user:User|null=null; private roomCode:string|null=null; private roomUnsub:(()=>void)|null=null;
+ private roomCallbacks=new Set<(room:RoomInfo)=>void>(); private startCallbacks=new Set<(data:{mode:RoomMode})=>void>(); private lastStarted=false;
+ get configured(){return configured;}
+ async connect(){if(!auth||!db)throw new Error("ยังไม่ได้ตั้งค่า Firebase — ทำตามขั้นตอนตั้งค่าก่อน");if(!auth.currentUser)await signInAnonymously(auth);this.user=auth.currentUser;if(!this.user)throw new Error("เข้าสู่ระบบผู้เล่นไม่สำเร็จ");}
+ private ready(){if(!db||!this.user)throw new Error("ยังไม่ได้เชื่อมต่อ Firebase");return {db,uid:this.user.uid};}
+ private watch(code:string){this.roomUnsub?.();this.roomCode=code;const {db}=this.ready();this.lastStarted=false;this.roomUnsub=onValue(ref(db,`rooms/${code}`),snap=>{const raw=snap.val();if(!raw){this.roomCallbacks.forEach(cb=>cb(null as unknown as RoomInfo));return;}const players:RoomPlayer[]=Object.entries(raw.players||{}).map(([id,v]:[string,any])=>({id,name:String(v.name||"IRON PILOT"),state:v.state||null}));const room:RoomInfo={code,mode:raw.mode,hostId:raw.hostId,players,started:Boolean(raw.started)};this.roomCallbacks.forEach(cb=>cb(room));if(room.started&&!this.lastStarted)this.startCallbacks.forEach(cb=>cb({mode:room.mode}));this.lastStarted=Boolean(room.started);},e=>console.error("Firebase room listener",e));}
+ async create(name:string,mode:RoomMode):Promise<{ok:true;room:RoomInfo}>{const {db,uid}=this.ready();await this.leave();for(let i=0;i<8;i++){const code=makeCode();const result=await runTransaction(ref(db,`rooms/${code}`),current=>current===null?{code,mode,hostId:uid,started:false,players:{[uid]:{name:cleanName(name),state:null,joinedAt:Date.now()}}}:undefined);if(result.committed){await onDisconnect(ref(db,`rooms/${code}/players/${uid}`)).remove();this.watch(code);return {ok:true,room:{code,mode,hostId:uid,players:[{id:uid,name:cleanName(name),state:null}],started:false}};}}throw new Error("สร้างรหัสห้องไม่สำเร็จ ลองอีกครั้ง");}
+ async join(name:string,inputCode:string):Promise<{ok:true;room:RoomInfo}>{const {db,uid}=this.ready();await this.leave();const code=String(inputCode||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);if(code.length!==6)throw new Error("กรอกรหัสห้อง 6 ตัว");let failure="";const result=await runTransaction(ref(db,`rooms/${code}`),room=>{if(!room){failure="ไม่พบห้องนี้";return;}room.players||={};if(room.started){failure="เกมเริ่มไปแล้ว เข้าห้องนี้ไม่ได้";return;}if(!room.players[uid]&&Object.keys(room.players).length>=4){failure="ห้องเต็มแล้ว (สูงสุด 4 คน)";return;}room.players[uid]={name:cleanName(name),state:null,joinedAt:Date.now()};return room;});if(!result.committed)throw new Error(failure||"เข้าห้องไม่สำเร็จ");await onDisconnect(ref(db,`rooms/${code}/players/${uid}`)).remove();this.watch(code);const raw=result.snapshot.val();const players:RoomPlayer[]=Object.entries(raw.players||{}).map(([id,v]:[string,any])=>({id,name:v.name,state:v.state||null}));return {ok:true,room:{code,mode:raw.mode,hostId:raw.hostId,players,started:Boolean(raw.started)}};}
+ async start(){const {db,uid}=this.ready();if(!this.roomCode)throw new Error("ไม่ได้อยู่ในห้อง");let failure="";const result=await runTransaction(ref(db,`rooms/${this.roomCode}`),room=>{if(!room){failure="ไม่พบห้อง";return;}if(room.hostId!==uid){failure="เฉพาะหัวหน้าห้องเท่านั้น";return;}room.started=true;return room;});if(!result.committed)throw new Error(failure||"เริ่มห้องไม่สำเร็จ");return {ok:true as const};}
+ async leave(){if(!db||!this.user||!this.roomCode)return;const code=this.roomCode,uid=this.user.uid;this.roomUnsub?.();this.roomUnsub=null;this.roomCode=null;await runTransaction(ref(db,`rooms/${code}`),room=>{if(!room?.players?.[uid])return room;delete room.players[uid];const ids=Object.keys(room.players);if(!ids.length)return null;if(room.hostId===uid)room.hostId=ids[0];return room;});await onDisconnect(ref(db,`rooms/${code}/players/${uid}`)).cancel();}
+ onRoomUpdate(cb:(room:RoomInfo)=>void){this.roomCallbacks.add(cb);return()=>this.roomCallbacks.delete(cb);}
+ onStarted(cb:(data:{mode:RoomMode})=>void){this.startCallbacks.add(cb);return()=>this.startCallbacks.delete(cb);}
+ disconnect(){void this.leave();this.roomCallbacks.clear();this.startCallbacks.clear();}
 }
