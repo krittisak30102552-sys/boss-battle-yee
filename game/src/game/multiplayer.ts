@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, signInAnonymously, type User } from "firebase/auth";
-import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, update, push, onChildAdded, type Database } from "firebase/database";
+import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, update, push, onChildAdded, remove, type Database } from "firebase/database";
 
 export type RoomMode = "coop" | "freeroam";
 export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }
@@ -121,7 +121,7 @@ export class MultiplayerClient {
     return onChildAdded(ref(db, `rooms/${this.code}/battle/hits`), snap => {
       const v = snap.val();
       if (!v || ![v.amount,v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;
-      callback({ amount: Math.max(0, Math.min(500, v.amount)), point: { x:v.x, y:v.y, z:v.z } });
+      callback({ amount: Math.max(0, Math.min(500, v.amount)), point: { x:v.x, y:v.y, z:v.z } });\n      void remove(snap.ref);
     });
   }
   async publishBossState(state: BossNetworkState) {
