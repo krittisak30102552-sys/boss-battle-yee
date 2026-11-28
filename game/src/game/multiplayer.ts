@@ -5,6 +5,16 @@ import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, update, p
 export type RoomMode = "coop" | "freeroam";
 export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }
 export interface BossNetworkState { x:number; y:number; z:number; yaw:number; hp:number; phase:number; state:string; t:number; walk:number; flash:number; think:number; did:number; updatedAt:number; }
+export interface CombatNetworkEvent {
+  type: "projectile" | "shock" | "meteor";
+  owner?: "p" | "b";
+  kind?: "bolt" | "orb" | "cannon" | "missile" | "refocus";
+  x: number; y: number; z: number;
+  vx?: number; vy?: number; vz?: number;
+  life?: number; dmg?: number; radius?: number; power?: number;
+  speed?: number;
+  by?: string; at?: number;
+}
 export interface RoomPlayer { id: string; name: string; state: PlayerState | null; }
 export interface RoomInfo { code: string; mode: RoomMode; hostId: string; players: RoomPlayer[]; started?: boolean; }
 
@@ -113,6 +123,22 @@ export class MultiplayerClient {
     const raw = result.snapshot.val();
     const players = Object.entries(raw.players || {}).map(([id, p]: [string, any]) => ({ id, name: p.name, state: null as null }));
     return { ok: true, room: { code, mode: raw.mode, hostId: raw.hostId, players, started: Boolean(raw.started) } };
+  }
+  async publishCombatEvent(event: CombatNetworkEvent) {
+    const { db, uid } = this.require();
+    if (!this.code) return;
+    const node = push(ref(db, `rooms/${this.code}/battle/events`));
+    await update(node, { ...event, by: uid, at: Date.now() });
+  }
+  onCombatEvent(callback: (event: CombatNetworkEvent) => void) {
+    const { db, uid } = this.require();
+    if (!this.code) throw new Error("ยังไม่ได้อยู่ในห้อง");
+    return onChildAdded(ref(db, `rooms/${this.code}/battle/events`), snap => {
+      const v = snap.val();
+      if (!v || v.by === uid || Date.now() - Number(v.at || 0) > 15000) return;
+      if (!["projectile", "shock", "meteor"].includes(v.type) || ![v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;
+      callback(v as CombatNetworkEvent);
+    });
   }
   async sendBossDamage(amount: number, point: {x:number;y:number;z:number}) {
     const { db, uid } = this.require();
