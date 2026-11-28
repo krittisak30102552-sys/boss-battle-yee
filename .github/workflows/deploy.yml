@@ -1,4 +1,5 @@
 name: Deploy game to GitHub Pages
+# Fresh workflow runs create one Pages artifact per run.
 on:
   push:
     branches: [main]
