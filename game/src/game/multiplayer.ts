@@ -109,7 +109,22 @@ export class MultiplayerClient {
     const players = Object.entries(raw.players || {}).map(([id, p]: [string, any]) => ({ id, name: p.name, state: null as null }));
     return { ok: true, room: { code, mode: raw.mode, hostId: raw.hostId, players, started: Boolean(raw.started) } };
   }
-  async sendBossDamage(amount: number, point: {x:number;y:number;z:number}) {\n    const { db, uid } = this.require();\n    if (!this.code) return;\n    const event = push(ref(db, `rooms/${this.code}/battle/hits`));\n    await update(event, { amount: Math.max(0, Math.min(500, amount)), x: point.x, y: point.y, z: point.z, by: uid, at: Date.now() });\n  }\n  onBossDamageRequest(callback: (hit: { amount:number; point:{x:number;y:number;z:number} }) => void) {\n    const { db } = this.require();\n    if (!this.code) throw new Error("ยังไม่ได้อยู่ในห้อง");\n    return onChildAdded(ref(db, `rooms/${this.code}/battle/hits`), snap => {\n      const v = snap.val();\n      if (!v || ![v.amount,v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;\n      callback({ amount: Math.max(0, Math.min(500, v.amount)), point: { x:v.x, y:v.y, z:v.z } });\n    });\n  }\n  async publishBossState(state: BossNetworkState) {
+  async sendBossDamage(amount: number, point: {x:number;y:number;z:number}) {
+    const { db, uid } = this.require();
+    if (!this.code) return;
+    const event = push(ref(db, `rooms/${this.code}/battle/hits`));
+    await update(event, { amount: Math.max(0, Math.min(500, amount)), x: point.x, y: point.y, z: point.z, by: uid, at: Date.now() });
+  }
+  onBossDamageRequest(callback: (hit: { amount:number; point:{x:number;y:number;z:number} }) => void) {
+    const { db } = this.require();
+    if (!this.code) throw new Error("ยังไม่ได้อยู่ในห้อง");
+    return onChildAdded(ref(db, `rooms/${this.code}/battle/hits`), snap => {
+      const v = snap.val();
+      if (!v || ![v.amount,v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;
+      callback({ amount: Math.max(0, Math.min(500, v.amount)), point: { x:v.x, y:v.y, z:v.z } });
+    });
+  }
+  async publishBossState(state: BossNetworkState) {
     const { db } = this.require();
     if (!this.code) return;
     await update(ref(db, `rooms/${this.code}/battle`), { boss: { ...state, updatedAt: Date.now() } });
