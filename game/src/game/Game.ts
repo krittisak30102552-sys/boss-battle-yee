@@ -23,6 +23,9 @@ export interface HudState {
   tonyExposed: boolean;
   bossHp: number;
   bossMax: number;
+  ultronHp: number;
+  ultronMax: number;
+  ultronActive: boolean;
   boost: number;
   weapon: number;
   morphing: boolean;
@@ -100,6 +103,8 @@ export const WEAPON_INFO: WeaponInfo[] = [
 
 const ARENA_R = 58;
 const BOSS_MAX = 20_000;
+const MARK50_THANOS_MAX = 1_000_000;
+const ULTRON_MAX = 2_000_000;
 const PLAYER_MAX = 300;
 const TONY_MAX = 250;
 const TAU = Math.PI * 2;
@@ -464,7 +469,11 @@ private nano: NanoSystem;
   private bpose = { shR: 0, elR: -0.2, shL: 0, elL: -0.2, lean: 0, crouch: 0, headX: 0, fall: 0 };
   private ultron: THREE.Group = new THREE.Group();
   private ultronActive = false;
+  private ultronHp = ULTRON_MAX;
   private ultronFire = 2.5;
+  private ultronDashCd = 2.8;
+  private ultronDashT = 0;
+  private ultronDashHit = false;
 
   // scratch
   private v1 = new THREE.Vector3();
@@ -590,11 +599,35 @@ private nano: NanoSystem;
   }
 
   private updateUltron(dt: number) {
-    if (!this.ultronActive || !this.bossAuthority || this.boss.state === "dead") return;
+    if (!this.ultronActive || !this.bossAuthority || this.ultronHp <= 0) return;
     const u = this.urig;
     const target = this.getBossTarget().position;
     const desired = new THREE.Vector3(this.boss.pos.x + 4.5 + Math.sin(this.time * 0.7) * 3.2, 5.6 + Math.sin(this.time * 2.4) * 0.45, this.boss.pos.z - 2.5 + Math.cos(this.time * 0.6) * 3);
-    this.ultron.position.lerp(desired, 1 - Math.exp(-2.8 * dt));
+    this.ultronDashCd -= dt;
+    if (this.ultronDashCd <= 0 && this.ultronDashT <= 0) {
+      this.ultronDashT = 0.32;
+      this.ultronDashCd = 3.6;
+      this.ultronDashHit = false;
+      this.say("ULTRON · LIGHTSPEED ASSAULT!", 1.4);
+    }
+    if (this.ultronDashT > 0) {
+      this.ultronDashT = Math.max(0, this.ultronDashT - dt);
+      this.ultron.position.lerp(new THREE.Vector3(target.x, Math.max(1.2, target.y + 1.1), target.z), 1 - Math.exp(-34 * dt));
+      if (!this.ultronDashHit && this.ultron.position.distanceTo(target) < 3.6) {
+        this.ultronDashHit = true;
+        if (this.pl.invul <= 0 && !this.armorDestroyed) {
+          this.pl.hp = Math.max(0, this.pl.hp - 42);
+          this.pl.flash = 1;
+          this.hurtCount++;
+          this.shake = 0.75;
+        }
+        this.spawnShock(this.ultron.position.x, this.ultron.position.z, 8, 18);
+        this.explode(this.ultron.position, 0.9, new THREE.Color(2.8, 0.35, 0.45));
+      }
+      for (let i = 0; i < 5; i++) this.fx.spawn(this.ultron.position.x + rnd(-1.8,1.8), this.ultron.position.y + rnd(-1,1), this.ultron.position.z + rnd(-1.8,1.8), rnd(-2,2), rnd(-1,1), rnd(-2,2), 0.22, 0.16, new THREE.Color(2.8,0.25,0.35));
+    } else {
+      this.ultron.position.lerp(desired, 1 - Math.exp(-2.8 * dt));
+    }
     this.ultron.lookAt(target.x, target.y + 1.2, target.z);
     this.ultron.rotation.x += Math.sin(this.time * 1.7) * 0.06;
     // idle animation: halo rings, core pulse, jet flame, fins breathing
@@ -968,6 +1001,15 @@ private nano: NanoSystem;
     this.boss.t = 0;
     this.boss.think = 2.2;
     this.boss.lunge = 0;
+    this.boss.hp = MARK50_THANOS_MAX;
+    this.boss.phase = 2;
+    this.ultronHp = ULTRON_MAX;
+    this.ultronActive = true;
+    this.ultron.visible = true;
+    this.ultron.position.set(this.boss.pos.x + 5, 5.5, this.boss.pos.z - 2);
+    this.ultronFire = 1.2;
+    this.ultronDashCd = 2.2;
+    this.ultronDashT = 0;
     this.armorModel = 50;
     this.applyArmorModel();
     this.suit.summonForTony();
@@ -1135,7 +1177,11 @@ touchLook(dx: number, dy: number) {
     b.last = "";
     b.lunge = 0;
     this.ultronActive = false;
+    this.ultronHp = ULTRON_MAX;
     this.ultronFire = 2.5;
+    this.ultronDashCd = 2.8;
+    this.ultronDashT = 0;
+    this.ultronDashHit = false;
     this.ultron.visible = false;
     this.ultron.position.set(5, 5, 14);
     this.brig.root.visible = true;
@@ -1274,7 +1320,10 @@ touchLook(dx: number, dy: number) {
       playerMax: this.armorDestroyed ? TONY_MAX : PLAYER_MAX,
       tonyExposed: this.armorDestroyed,
       bossHp: Math.max(0, Math.ceil(b.hp)),
-      bossMax: BOSS_MAX,
+      bossMax: this.armorModel === 50 ? MARK50_THANOS_MAX : BOSS_MAX,
+      ultronHp: Math.max(0, Math.ceil(this.ultronHp)),
+      ultronMax: ULTRON_MAX,
+      ultronActive: this.ultronActive,
       boost: this.pl.boost,
       weapon: this.nano.pending,
       morphing: !this.nano.ready,
@@ -1475,7 +1524,7 @@ touchLook(dx: number, dy: number) {
   /* ---- MARK 50: Model Prime exclusive abilities ---- */
   private mark50Hit(damage: number, color: THREE.Color, label: string, stagger = 0) {
     const b = this.boss;
-    if (b.state === "dead" || b.state === "roar") return;
+    if (b.state === "roar" || (b.state === "dead" && this.ultronHp <= 0)) return;
     this.rig.root.updateMatrixWorld(true);
     const from = this.rig.handR.getWorldPosition(new THREE.Vector3());
     const to = new THREE.Vector3(b.pos.x, b.pos.y + 3.8, b.pos.z);
@@ -1484,8 +1533,9 @@ touchLook(dx: number, dy: number) {
     for (let i = 0; i < 28; i++) {
       this.fx.spawn(to.x, to.y, to.z, rnd(-12, 12), rnd(-8, 12), rnd(-12, 12), rnd(0.25, 0.65), rnd(0.12, 0.28), color);
     }
-    this.damageBoss(damage, to);
-    if (stagger > 0) this.staggerBoss(stagger);
+    if (b.state !== "dead") this.damageBoss(damage * 10, to);
+    if (this.ultronActive && this.ultronHp > 0) this.damageUltron(damage * 10, new THREE.Vector3(this.ultron.position.x, this.ultron.position.y, this.ultron.position.z));
+    if (stagger > 0 && b.state !== "dead") this.staggerBoss(stagger);
     this.shake = Math.max(this.shake, 0.45);
     this.say(label, 1.25);
     sfx.boom();
@@ -3357,6 +3407,31 @@ private updatePlayerPose(dt: number) {
     this.emitHud(false);
   }
 
+  private damageUltron(amount: number, point: THREE.Vector3) {
+    if (!this.bossAuthority || !this.ultronActive || this.ultronHp <= 0 || this.status !== "playing") return;
+    this.ultronHp = Math.max(0, this.ultronHp - amount);
+    (this.urig.core.material as THREE.MeshStandardMaterial).emissiveIntensity = 10;
+    this.hitCount++;
+    this.shake = Math.max(this.shake, 0.18);
+    const c = new THREE.Color(2.5, 0.3, 0.5);
+    for (let i = 0; i < 12; i++) this.fx.spawn(point.x, point.y, point.z, rnd(-8,8), rnd(-4,8), rnd(-8,8), 0.4, 0.18, c);
+    if (this.ultronHp <= 0) {
+      this.ultronHp = 0;
+      this.ultronActive = false;
+      this.ultron.visible = false;
+      this.say("ULTRON · SYSTEM FAILURE", 3);
+      if (this.boss.state === "dead") this.finishBossVictory();
+    }
+  }
+
+  private finishBossVictory() {
+    if (this.boss.state !== "dead" || this.ultronHp > 0 || this.status !== "playing") return;
+    this.status = "won";
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    this.mouseDown = false;
+    this.emitHud(true);
+  }
+
   private damageBoss(amount: number, point: THREE.Vector3, noUlt = false): boolean {
     const b = this.boss;
     if (this.status !== "playing") return false;
@@ -3385,12 +3460,9 @@ private updatePlayerPose(dt: number) {
       this.shake = 1;
       return true;
     }
-    if (this.bossAuthority && b.phase === 1 && b.hp <= BOSS_MAX * 0.5) {
+    if (this.bossAuthority && this.armorModel !== 50 && b.phase === 1 && b.hp <= BOSS_MAX * 0.5) {
       b.phase = 2;
-      this.ultronActive = true;
-      this.ultron.visible = true;
-      this.ultron.position.set(b.pos.x + 5, 5.5, b.pos.z - 2);
-      this.say("ULTRON REINFORCEMENTS DEPLOYED", 3.0);
+      this.say("THANOS · RAGE PHASE", 3.0);
       b.state = "roar";
       b.t = 0;
       b.did = 0;
@@ -3843,10 +3915,8 @@ private updatePlayerPose(dt: number) {
           sfx.boom();
         }
         if (b.t > 4.6 && this.status === "playing") {
-          this.status = "won";
-          if (document.pointerLockElement === this.canvas) document.exitPointerLock();
-          this.mouseDown = false;
-          this.emitHud(true);
+          if (this.ultronActive && this.ultronHp > 0) { b.t = 4.6; }
+          else this.finishBossVictory();
         }
         break;
       }
