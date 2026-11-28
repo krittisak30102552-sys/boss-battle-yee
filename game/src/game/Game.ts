@@ -90,7 +90,7 @@ export const WEAPON_INFO: WeaponInfo[] = [
 /* ------------------------------------------------------------------ */
 
 const ARENA_R = 58;
-const BOSS_MAX = 100_000;
+const BOSS_MAX = 50_000;
 const PLAYER_MAX = 250;
 const TONY_MAX = 250;
 const TAU = Math.PI * 2;
@@ -2642,7 +2642,12 @@ private updatePlayerPose(dt: number) {
     g.scale.setScalar(0.75);
     g.position.copy(from);
     this.scene.add(g);
-    this.projs.push({ mesh: g, vel: dir.clone().multiplyScalar(speed), life: 4, dmg, owner: "b", r: 0.75, kind: "orb", power: 0 });
+    const velocity = dir.clone().multiplyScalar(speed);
+    this.projs.push({ mesh: g, vel: velocity, life: 4, dmg, owner: "b", r: 0.75, kind: "orb", power: 0 });
+    if (this.bossAuthority && !this.receivingCombatEvent) this.combatEventSender?.({
+      type:"projectile", owner:"b", kind:"orb", x:from.x,y:from.y,z:from.z,
+      vx:velocity.x,vy:velocity.y,vz:velocity.z,life:4,dmg,radius:0.75,power:0
+    });
   }
 
   private spawnShock(x: number, z: number, speed: number, dmg: number) {
@@ -2786,7 +2791,7 @@ private updatePlayerPose(dt: number) {
   }
   getBossNetworkState(): BossNetworkState {
     const b = this.boss;
-    return { x:b.pos.x,y:b.pos.y,z:b.pos.z,yaw:b.yaw,hp:b.hp,phase:b.phase,state:b.state,t:b.t,walk:b.walk,flash:b.flash,think:b.think,did:b.did,shR:this.bpose.shR,elR:this.bpose.elR,shL:this.bpose.shL,elL:this.bpose.elL,lean:this.bpose.lean,crouch:this.bpose.crouch,headX:this.bpose.headX,fall:this.bpose.fall,updatedAt:Date.now() };
+    return { x:b.pos.x,y:b.pos.y,z:b.pos.z,yaw:b.yaw,hp:b.hp,phase:b.phase,state:b.state,t:b.t,walk:b.walk,flash:b.flash,think:b.think,did:b.did,shR:this.bpose.shR,elR:this.bpose.elR,shL:this.bpose.shL,elL:this.bpose.elL,lean:this.bpose.lean,crouch:this.bpose.crouch,headX:this.bpose.headX,fall:this.bpose.fall,bdirX:b.bdir.x,bdirY:b.bdir.y,bdirZ:b.bdir.z,bendX:b.bend.x,bendY:b.bend.y,bendZ:b.bend.z,updatedAt:Date.now() };
   }
   applyBossNetworkState(s: BossNetworkState) {
     if (this.bossAuthority) return;
@@ -2800,6 +2805,8 @@ private updatePlayerPose(dt: number) {
     this.bpose.shL=s.shL ?? 0; this.bpose.elL=s.elL ?? -0.2;
     this.bpose.lean=s.lean ?? 0; this.bpose.crouch=s.crouch ?? 0;
     this.bpose.headX=s.headX ?? 0; this.bpose.fall=s.fall ?? 0;
+    if ([s.bdirX,s.bdirY,s.bdirZ].every(Number.isFinite)) b.bdir.set(s.bdirX!,s.bdirY!,s.bdirZ!);
+    if ([s.bendX,s.bendY,s.bendZ].every(Number.isFinite)) b.bend.set(s.bendX!,s.bendY!,s.bendZ!);
     this.emitHud(false);
   }
 
@@ -2901,6 +2908,8 @@ private updatePlayerPose(dt: number) {
     b.state = a as BossState;
     b.t = 0;
     b.did = 0;
+    b.lunge = 0;
+    b.pos.y = 0;
   }
 
   private getBossTarget() {
@@ -2952,6 +2961,15 @@ private updatePlayerPose(dt: number) {
       b.pos.z += f.z * 18 * dt;
     }
 
+    // Recovery watchdog: an interrupted animation can never leave the boss frozen forever.
+    const stateTimeout: Record<BossState, number> = {
+      idle: 999, punch: 2.4, slam: 3.2, orbs: 3.8, meteor: 4.8,
+      rush: 3.2, beam: 3.4, stagger: 2.2, roar: 3.0, dead: 999
+    };
+    if (b.t > stateTimeout[b.state] && b.state !== "idle" && b.state !== "dead") {
+      this.endAttack(0.45);
+    }
+
     switch (b.state) {
       case "idle": {
         if (!live) break;
@@ -2965,9 +2983,9 @@ private updatePlayerPose(dt: number) {
         } else {
           b.walk *= 0.98;
         }
-        bp.lean = dist > 5.5 ? 0.12 : 0;
-        bp.shR = Math.sin(b.walk) * 0.35;
-        bp.shL = -Math.sin(b.walk) * 0.35;
+        bp.lean = dist > 5.5 ? 0.12 : Math.sin(this.time * 1.7) * 0.025;
+        bp.shR = Math.sin(b.walk) * 0.35 + Math.sin(this.time * 1.3) * 0.025;
+        bp.shL = -Math.sin(b.walk) * 0.35 - Math.sin(this.time * 1.3) * 0.025;
         b.think -= dt;
         if (b.think <= 0) this.chooseAttack(dist);
         break;
@@ -3253,7 +3271,7 @@ private updatePlayerPose(dt: number) {
     b.state = "idle";
     b.t = 0;
     b.did = 0;
-    b.think = b.phase === 2 ? think * 0.55 : think;
+    b.think = b.phase === 2 ? think * 0.45 : Math.min(think, 0.65);
     b.pos.y = 0;
   }
 
