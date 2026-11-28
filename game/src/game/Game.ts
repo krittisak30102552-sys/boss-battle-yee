@@ -2743,7 +2743,15 @@ private updatePlayerPose(dt: number) {
   /* ---------------------------------------------------------------- */
 
   private bossAuthority = true;
+  private networkBossDamageSender: ((amount: number, point: { x: number; y: number; z: number }) => void) | null = null;
   setBossAuthority(authority: boolean) { this.bossAuthority = authority; }
+  setNetworkBossDamageSender(sender: ((amount: number, point: { x: number; y: number; z: number }) => void) | null) {
+    this.networkBossDamageSender = sender;
+  }
+  applyNetworkBossDamage(amount: number, point: { x: number; y: number; z: number }) {
+    if (!this.bossAuthority || !Number.isFinite(amount) || amount <= 0) return;
+    this.damageBoss(Math.min(500, amount), new THREE.Vector3(point.x, point.y, point.z));
+  }
   getBossNetworkState(): BossNetworkState {
     const b = this.boss;
     return { x:b.pos.x,y:b.pos.y,z:b.pos.z,yaw:b.yaw,hp:b.hp,phase:b.phase,state:b.state,t:b.t,walk:b.walk,flash:b.flash,think:b.think,did:b.did,updatedAt:Date.now() };
@@ -2762,6 +2770,10 @@ private updatePlayerPose(dt: number) {
     const b = this.boss;
     if (this.status !== "playing") return false;
     if (b.state === "dead" || b.state === "roar") return false;
+    if (!this.bossAuthority) {
+      this.networkBossDamageSender?.(Math.max(0, Math.min(500, amount)), { x: point.x, y: point.y, z: point.z });
+      return false;
+    }
     b.hp -= amount;
     if (!noUlt) this.pl.ult = Math.min(100, this.pl.ult + amount * 0.06);
     b.flash = 1;
