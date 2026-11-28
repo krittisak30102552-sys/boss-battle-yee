@@ -100,7 +100,7 @@ export const WEAPON_INFO: WeaponInfo[] = [
 
 const ARENA_R = 58;
 const BOSS_MAX = 50_000;
-const PLAYER_MAX = 250;
+const PLAYER_MAX = 20_000;
 const TONY_MAX = 250;
 const TAU = Math.PI * 2;
 
@@ -1472,6 +1472,152 @@ touchLook(dx: number, dy: number) {
     p.invul = Math.max(p.invul, 0.4);
   }
 
+  /* ---- MARK 50: Model Prime exclusive abilities ---- */
+  private mark50Hit(damage: number, color: THREE.Color, label: string, stagger = 0) {
+    const b = this.boss;
+    if (b.state === "dead" || b.state === "roar") return;
+    this.rig.root.updateMatrixWorld(true);
+    const from = this.rig.handR.getWorldPosition(new THREE.Vector3());
+    const to = new THREE.Vector3(b.pos.x, b.pos.y + 3.8, b.pos.z);
+    this.spawnFlash(from, to, color, 0.12, 0.32);
+    this.explode(to, 0.48, color);
+    for (let i = 0; i < 28; i++) {
+      this.fx.spawn(to.x, to.y, to.z, rnd(-12, 12), rnd(-8, 12), rnd(-12, 12), rnd(0.25, 0.65), rnd(0.12, 0.28), color);
+    }
+    this.damageBoss(damage, to);
+    if (stagger > 0) this.staggerBoss(stagger);
+    this.shake = Math.max(this.shake, 0.45);
+    this.say(label, 1.25);
+    sfx.boom();
+  }
+
+  private mark50Pulse() {
+    this.pl.cd = 0.12;
+    const c = new THREE.Color(0.35, 2.8, 4);
+    this.mark50Hit(420, c, "MARK 50 · PHOTON REPULSOR");
+  }
+
+  private mark50Nova() {
+    this.pl.cd = 2.4;
+    const p = this.pl;
+    const c = new THREE.Color(0.3, 2.2, 4);
+    this.spawnRing(p.pos.x, 0.35, p.pos.z, c, 38, 34);
+    this.spawnRing(p.pos.x, 0.5, p.pos.z, new THREE.Color(1.2, 1.8, 3), 25, 26);
+    this.mark50Hit(1_800, c, "MARK 50 · NOVA PULSE", 1.0);
+  }
+
+  private mark50ArcLance() {
+    this.pl.cd = 1.8;
+    this.rig.root.updateMatrixWorld(true);
+    const b = this.boss;
+    const to = new THREE.Vector3(b.pos.x, b.pos.y + 3.8, b.pos.z);
+    const c = new THREE.Color(0.5, 2.8, 4);
+    for (const hand of [this.rig.handR, this.rig.handL]) {
+      const from = hand.getWorldPosition(new THREE.Vector3());
+      this.spawnFlash(from, to, c, 0.18, 0.38);
+    }
+    this.mark50Hit(2_200, c, "MARK 50 · ARC LANCE", 0.5);
+  }
+
+  private mark50DroneSwarm() {
+    this.pl.cd = 4.0;
+    const b = this.boss;
+    const c = new THREE.Color(1.5, 2.2, 3.2);
+    this.rig.root.updateMatrixWorld(true);
+    for (let i = 0; i < 10; i++) {
+      const from = (i % 2 ? this.rig.handL : this.rig.handR).getWorldPosition(new THREE.Vector3());
+      const to = new THREE.Vector3(b.pos.x + rnd(-2.5, 2.5), b.pos.y + rnd(2, 6), b.pos.z + rnd(-2.5, 2.5));
+      this.spawnFlash(from, to, c, 0.055, 0.24);
+      this.fx.spawn(from.x, from.y, from.z, rnd(-5, 5), rnd(1, 7), rnd(-5, 5), 0.45, 0.2, c);
+      this.damageBoss(480, to);
+    }
+    this.shake = Math.max(this.shake, 0.65);
+    this.say("MARK 50 · AUTONOMOUS DRONE SWARM", 1.5);
+    sfx.boom();
+  }
+
+  private mark50Repair() {
+    const p = this.pl;
+    if (p.hp >= PLAYER_MAX) {
+      this.say("เกราะสมบูรณ์อยู่แล้ว", 1);
+      p.cd = 0.5;
+      return;
+    }
+    p.cd = 12;
+    p.hp = Math.min(PLAYER_MAX, p.hp + 5_000);
+    p.invul = Math.max(p.invul, 1.4);
+    const c = new THREE.Color(0.3, 3, 1.8);
+    this.spawnRing(p.pos.x, 0.3, p.pos.z, c, 18, 12);
+    for (let i = 0; i < 70; i++) {
+      const a = Math.random() * TAU;
+      this.fx.spawn(p.pos.x + Math.cos(a) * rnd(0.5, 2.5), p.pos.y + rnd(0, 3), p.pos.z + Math.sin(a) * rnd(0.5, 2.5), rnd(-2, 2), rnd(1, 5), rnd(-2, 2), 0.55, 0.16, c);
+    }
+    this.say("MARK 50 · NANO RECONSTRUCTION +5,000 HP", 1.8);
+    sfx.heal();
+  }
+
+  private mark50Overdrive() {
+    this.pl.cd = 8;
+    const c = new THREE.Color(2.4, 0.8, 3.2);
+    this.mark50Hit(4_000, c, "MARK 50 · PRIME OVERDRIVE", 1.6);
+    this.spawnRing(this.boss.pos.x, 0.3, this.boss.pos.z, c, 42, 28);
+  }
+
+  private mark50BladeStorm() {
+    this.pl.cd = 1.2;
+    const b = this.boss;
+    const c = new THREE.Color(0.5, 2.8, 4);
+    const point = new THREE.Vector3(b.pos.x, b.pos.y + 3.8, b.pos.z);
+    this.rig.root.updateMatrixWorld(true);
+    for (let i = 0; i < 6; i++) {
+      const from = (i % 2 ? this.rig.handL : this.rig.handR).getWorldPosition(new THREE.Vector3());
+      this.spawnFlash(from, point, c, 0.09 + i * 0.01, 0.2 + i * 0.025);
+      this.damageBoss(650, point);
+    }
+    this.say("MARK 50 · NANO BLADE STORM", 1.1);
+    sfx.slash();
+  }
+
+  private mark50GravityHammer() {
+    this.pl.cd = 3;
+    const b = this.boss;
+    const c = new THREE.Color(1.8, 1.0, 3.2);
+    this.mark50Hit(5_000, c, "MARK 50 · GRAVITY BREAKER", 2.0);
+    this.spawnRing(b.pos.x, 0.25, b.pos.z, c, 55, 30);
+  }
+
+  private mark50MissileBarrage() {
+    this.pl.cd = 5;
+    const b = this.boss;
+    const c = new THREE.Color(2.8, 1.4, 0.55);
+    this.rig.root.updateMatrixWorld(true);
+    for (let i = 0; i < 12; i++) {
+      const from = (i % 2 ? this.rig.handL : this.rig.handR).getWorldPosition(new THREE.Vector3());
+      const to = new THREE.Vector3(b.pos.x + rnd(-3, 3), b.pos.y + rnd(1, 7), b.pos.z + rnd(-3, 3));
+      this.spawnFlash(from, to, c, 0.07, 0.3);
+      this.damageBoss(500, to);
+    }
+    this.shake = Math.max(this.shake, 0.8);
+    this.say("MARK 50 · HYPER MISSILE BARRAGE", 1.5);
+    sfx.boom();
+  }
+
+  private mark50Singularity() {
+    this.pl.cd = 12;
+    const p = this.pl;
+    const b = this.boss;
+    const c = new THREE.Color(2.5, 1.8, 4);
+    for (const pr of this.projs) if (pr.owner === "b") pr.mesh.removeFromParent();
+    this.projs = this.projs.filter((pr) => pr.owner !== "b");
+    for (const m of this.meteors) this.removeMeteor(m);
+    this.meteors = [];
+    for (const sh of this.shocks) this.removeShock(sh);
+    this.shocks = [];
+    this.spawnRing(p.pos.x, 0.3, p.pos.z, c, 75, 100);
+    this.spawnRing(b.pos.x, 0.4, b.pos.z, new THREE.Color(0.4, 2.8, 4), 48, 42);
+    this.mark50Hit(10_000, c, "MARK 50 · PRIME SINGULARITY", 3.0);
+  }
+
   private heal() {
     if (this.armorDestroyed) return;
     const p = this.pl;
@@ -1528,7 +1674,21 @@ touchLook(dx: number, dy: number) {
     let blocking = false;
     let absorbing = false;
     let uniOn = false;
-    if (ready) {
+    if (ready && this.armorModel === 50) {
+      switch (w) {
+        case 0: if (down && p.cd <= 0) this.mark50Pulse(); break;
+        case 1: if (down && p.cd <= 0) this.mark50Nova(); break;
+        case 2: if (down && p.cd <= 0) this.mark50ArcLance(); break;
+        case 3: if (down && p.cd <= 0) this.mark50DroneSwarm(); break;
+        case 4: if (down && p.cd <= 0) this.mark50Repair(); break;
+        case 5: if (down && p.cd <= 0) this.mark50Overdrive(); break;
+        case 6: if (down && p.cd <= 0) this.mark50BladeStorm(); break;
+        case 7: if (down && p.cd <= 0) this.mark50GravityHammer(); break;
+        case 8: if (down && p.cd <= 0) this.mark50MissileBarrage(); break;
+        case 9: blocking = down; break;
+        case 10: if (down && p.cd <= 0) this.mark50Singularity(); break;
+      }
+    } else if (ready) {
       switch (w) {
         case W.REPULSOR:
           if (down && p.cd <= 0) this.fireBolt();
