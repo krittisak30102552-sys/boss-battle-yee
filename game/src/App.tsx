@@ -47,15 +47,15 @@ const INITIAL: HudState = {
 const MARK50_WEAPON_INFO = [
   { key: "1", code: "Digit1", name: "PHOTON REPULSOR", th: "โฟตอนบลาสต์", short: "โฟตอน", desc: "ยิงโฟตอนความถี่สูงต่อเนื่อง ดาเมจ 1,200 ต่อช็อต" },
   { key: "2", code: "Digit2", name: "NOVA PULSE", th: "คลื่นโนวา", short: "โนวา", desc: "ปล่อยคลื่นพลังงานวงกว้าง สร้างความเสียหาย 4,000 และทำให้บอสชะงัก" },
-  { key: "3", code: "Digit3", name: "ARC LANCE", th: "อาร์คแลนซ์", short: "อาร์ค", desc: "ยิงลำแสงคู่จากมือทั้งสอง ดาเมจ 20,000" },
+  { key: "3", code: "Digit3", name: "ARC LANCE", th: "อาร์คแลนซ์", short: "อาร์ค", desc: "ยิงลำแสงคู่จากมือทั้งสอง ดาเมจ 5,000" },
   { key: "4", code: "Digit4", name: "DRONE SWARM", th: "ฝูงโดรน", short: "โดรน", desc: "ปล่อยโดรนนาโน 10 ลำโจมตีพร้อมกัน รวม 12,000 ดาเมจ" },
   { key: "5", code: "Digit5", name: "NANO RECONSTRUCTION", th: "ซ่อมเกราะ", short: "ซ่อม", desc: "ฟื้นฟูเกราะ 10,000 HP และอมตะชั่วครู่ · คูลดาวน์ 12 วิ" },
   { key: "6", code: "Digit6", name: "PRIME OVERDRIVE", th: "โอเวอร์ไดรฟ์", short: "โอเวอร์", desc: "อัดพลังอาร์คเต็มกำลัง ดาเมจ 8,000 และทำให้บอสชะงัก" },
   { key: "7", code: "Digit7", name: "NANO BLADE STORM", th: "พายุใบมีด", short: "ใบมีด", desc: "ฟันต่อเนื่อง 6 จังหวะ รวม 7,200 ดาเมจ" },
-  { key: "8", code: "Digit8", name: "GRAVITY BREAKER", th: "ค้อนแรงโน้มถ่วง", short: "ค้อน", desc: "ทุบพลังงานแรงโน้มถ่วง ดาเมจ 5,000 และหยุดบอส" },
+  { key: "8", code: "Digit8", name: "GRAVITY BREAKER", th: "ค้อนแรงโน้มถ่วง", short: "ค้อน", desc: "ทุบพลังงานแรงโน้มถ่วง ดาเมจ 10,000 และหยุดบอส" },
   { key: "9", code: "Digit9", name: "HYPER MISSILE BARRAGE", th: "มิสไซล์ถล่ม", short: "มิสไซล์", desc: "ยิงมิสไซล์นำวิถี 12 ลูก รวม 12,000 ดาเมจ" },
   { key: "0", code: "Digit0", name: "AEGIS REFLECTOR", th: "โล่เอจิส", short: "โล่", desc: "กดค้างเพื่อกางโล่พลังงานและปัดป้องการโจมตีด้านหน้า" },
-  { key: "G", code: "KeyG", name: "PRIME SINGULARITY", th: "ไพรม์ซิงกูลาริตี", short: "ซิงกูลาร์", desc: "ท่าไม้ตาย ล้างกระสุน/อุกกาบาตของบอส ดาเมจ 10,000 และหยุดบอส · คูลดาวน์ 12 วิ" },
+  { key: "G", code: "KeyG", name: "PRIME SINGULARITY", th: "ไพรม์ซิงกูลาริตี", short: "ซิงกูลาร์", desc: "ท่าไม้ตาย ล้างกระสุน/อุกกาบาตของบอส ดาเมจ 20,000 และหยุดบอส · คูลดาวน์ 12 วิ" },
 ] as const;
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
