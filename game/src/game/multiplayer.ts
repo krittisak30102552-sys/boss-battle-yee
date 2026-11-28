@@ -54,7 +54,12 @@ export class MultiplayerClient {
     this.unsubscribe = onValue(ref(db, `rooms/${code}`), snap => {
       const data = snap.val();
       if (!data) { this.roomCallbacks.forEach(cb => cb(null as unknown as RoomInfo)); return; }
-      const players = Object.entries(data.players || {}).map(([id, p]: [string, any]) => ({ id, name: String(p.name || "IRON PILOT"), state: p.state && [p.state.x,p.state.y,p.state.z,p.state.heading].every((v: unknown) => typeof v === "number" && Number.isFinite(v)) ? { x: p.state.x, y: p.state.y, z: p.state.z, heading: p.state.heading, flying: Boolean(p.state.flying) } : null }));
+      const players = Object.entries(data.players || {}).flatMap(([id, raw]: [string, any]) => {
+        if (!raw || typeof raw !== "object") return [];
+        const state = raw.state;
+        const validState = state && [state.x,state.y,state.z,state.heading].every((v: unknown) => typeof v === "number" && Number.isFinite(v));
+        return [{ id, name: String(raw.name || "IRON PILOT"), state: validState ? { x: state.x, y: state.y, z: state.z, heading: state.heading, flying: Boolean(state.flying) } : null }];
+      });
       const room: RoomInfo = { code, mode: data.mode, hostId: data.hostId, players, started: Boolean(data.started) };
       this.roomCallbacks.forEach(cb => cb(room));
       if (room.started && !this.wasStarted) this.startCallbacks.forEach(cb => cb({ mode: room.mode }));
