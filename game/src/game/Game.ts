@@ -3011,7 +3011,8 @@ private updatePlayerPose(dt: number) {
           bp.crouch = 0.35 * Math.min(1, b.t / 0.5);
           // Lock the take-off and landing points once at the start of the leap.
           // Recalculating these every frame makes Thanos drift/teleport mid-air.
-          if (b.t <= 0.08) {
+          if (b.did !== -1) {
+            b.did = -1;
             b.from.copy(b.pos);
             b.from.y = 0;
             const target = this.v1.set(targetPos.x, 0, targetPos.z);
@@ -3038,7 +3039,7 @@ private updatePlayerPose(dt: number) {
             bp.lean = 0.3;
           }
         } else {
-          if (!b.did) {
+          if (b.did !== 1) {
             b.did = 1;
             b.pos.copy(b.to);
             b.pos.y = 0;
