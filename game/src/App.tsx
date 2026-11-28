@@ -149,7 +149,16 @@ export default function App() {
     if (!game || !room || !mpUid) return;
     const isHost = room.hostId === mpUid;
     game.setBossAuthority(isHost);
-    if (isHost) return;
+    if (isHost) {
+      let active = true;
+      let off: (() => void) | undefined;
+      try { off = mp.onBossDamageRequest((hit) => { if (active) game.applyNetworkBossDamage(hit.amount, hit.point); }); }
+      catch (e) { setMpError(e instanceof Error ? e.message : String(e)); }
+      return () => { active = false; off?.(); };
+    }
+    game.setNetworkBossDamageSender((amount, point) => {
+      void mp.sendBossDamage(amount, point).catch((e) => setMpError(e instanceof Error ? e.message : String(e)));
+    });
     let active = true;
     let off: (() => void) | undefined;
     try {
@@ -159,7 +168,7 @@ export default function App() {
     } catch (e) {
       setMpError(e instanceof Error ? e.message : String(e));
     }
-    return () => { active = false; off?.(); };
+    return () => { active = false; off?.(); game.setNetworkBossDamageSender(null); };
   }, [mp, mpRoom?.code, mpRoom?.hostId, mpUid]);
 
   useEffect(() => {
