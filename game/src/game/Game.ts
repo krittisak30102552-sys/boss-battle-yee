@@ -336,6 +336,7 @@ export class Game {
   // player
   private rig: IronRig;
   private remoteRigs = new Map<string, { rig: IronRig; target: THREE.Vector3; heading: number }>();
+  private networkPlayerId: string | null = null;
   private armorModel: 50 | 85 = 85;
   private mark85Colors: THREE.Color[] = [];
   private combatMode = 0;
@@ -808,6 +809,7 @@ private nano: NanoSystem;
   }
 
   setRemotePlayers(players: Array<{ id: string; name: string; state: { x: number; y: number; z: number; heading: number; flying?: boolean } | null }>, ownId?: string) {
+    this.networkPlayerId = ownId || null;
     const present = new Set(players.filter(p => p.id !== ownId && p.state).map(p => p.id));
     for (const [id, remote] of this.remoteRigs) {
       if (!present.has(id)) { this.scene.remove(remote.rig.root); this.remoteRigs.delete(id); }
@@ -2757,7 +2759,8 @@ private updatePlayerPose(dt: number) {
   applyNetworkCombatEvent(event: CombatNetworkEvent) {
     this.receivingCombatEvent = true;
     try {
-      if (event.type === "projectile") {
+      if (event.type === "playerHit") { if (event.targetId === this.networkPlayerId) this.damagePlayer(Math.max(0,event.dmg||0), new THREE.Vector3(event.x,event.y,event.z), event.hitKind || "proj"); }
+      else if (event.type === "projectile") {
         const kind = event.kind || "bolt";
         const mesh = kind === "bolt" || kind === "missile" ? new THREE.Mesh(this.boltGeo, this.boltMat) : new THREE.Group();
         if (kind === "orb") { const core=new THREE.Mesh(this.sphereGeo,this.orbCore); const shell=new THREE.Mesh(this.sphereGeo,this.orbShell); shell.scale.setScalar(1.6); mesh.add(core,shell); }
@@ -2893,13 +2896,30 @@ private updatePlayerPose(dt: number) {
     b.did = 0;
   }
 
+  private getBossTarget() {
+    let position = this.pl.pos;
+    let id = this.networkPlayerId;
+    let distance = position.distanceTo(this.boss.pos);
+    for (const [remoteId, remote] of this.remoteRigs) {
+      const d = remote.target.distanceTo(this.boss.pos);
+      if (d < distance) { distance = d; position = remote.target; id = remoteId; }
+    }
+    return { position, id, distance };
+  }
+  private damageBossTarget(amount: number, point: THREE.Vector3, kind: "melee" | "wave" | "proj") {
+    const target = this.getBossTarget();
+    if (!target.id || target.id === this.networkPlayerId) this.damagePlayer(amount, point, kind);
+    else this.combatEventSender?.({ type:"playerHit", x:point.x,y:point.y,z:point.z,dmg:amount,targetId:target.id,hitKind:kind });
+  }
   private updateBoss(dt: number) {
     const b = this.boss;
     const p = this.pl;
+    const target = this.getBossTarget();
+    const targetPos = target.position;
     b.flash = Math.max(0, b.flash - dt * 4);
     b.t += dt;
-    const dx = p.pos.x - b.pos.x;
-    const dz = p.pos.z - b.pos.z;
+    const dx = targetPos.x - b.pos.x;
+    const dz = targetPos.z - b.pos.z;
     const dist = Math.hypot(dx, dz);
     const bp = this.bpose;
     const p2 = b.phase === 2;
@@ -2963,8 +2983,8 @@ private updatePlayerPose(dt: number) {
             b.lunge = 0.14;
             sfx.slash();
             const reach = Math.hypot(dx, dz);
-            if (reach < 8.2 && this.isFront(b.pos, p.pos, b.yaw, 0.2) && p.pos.y < 7) {
-              this.damagePlayer(p2 ? 34 : 28, b.pos, "melee");
+            if (reach < 8.2 && this.isFront(b.pos, targetPos, b.yaw, 0.2) && targetPos.y < 7) {
+              this.damageBossTarget(p2 ? 34 : 28, b.pos, "melee");
             }
             this.shake = Math.max(this.shake, 0.2);
           }
@@ -2981,7 +3001,7 @@ private updatePlayerPose(dt: number) {
           bp.elL = -0.3;
           bp.crouch = 0.35 * Math.min(1, b.t / 0.5);
           b.from.copy(b.pos);
-          const target = this.v1.set(p.pos.x, 0, p.pos.z);
+          const target = this.v1.set(targetPos.x, 0, targetPos.z);
           const dv = this.v2.copy(target).sub(b.pos);
           const l = dv.length();
           if (l > 28) dv.multiplyScalar(28 / l);
@@ -3007,7 +3027,7 @@ private updatePlayerPose(dt: number) {
             b.pos.copy(b.to);
             b.pos.y = 0;
             this.spawnShock(b.pos.x, b.pos.z, p2 ? 28 : 24, p2 ? 36 : 30);
-            if (Math.hypot(dx, dz) < 4.5 && p.pos.y < 2) this.damagePlayer(36, b.pos, "wave");
+            if (Math.hypot(dx, dz) < 4.5 && targetPos.y < 2) this.damageBossTarget(36, b.pos, "wave");
             this.shake = 1;
             sfx.boom();
             this.explode(this.v1.set(b.pos.x, 0.5, b.pos.z), 1, new THREE.Color(1.8, 0.8, 2.4));
@@ -3029,7 +3049,7 @@ private updatePlayerPose(dt: number) {
         if (b.t > 0.7 + b.did * 0.32 && b.did < n) {
           b.did++;
           const from = this.gauntletPos(new THREE.Vector3());
-          const aim = new THREE.Vector3(p.pos.x + p.vel.x * 0.25, p.pos.y + 1.1, p.pos.z + p.vel.z * 0.25);
+          const aim = new THREE.Vector3(targetPos.x, targetPos.y + 1.1, targetPos.z);
           const dir = aim.sub(from).normalize();
           if (p2) {
             dir.x += rnd(-0.07, 0.07);
@@ -3058,8 +3078,8 @@ private updatePlayerPose(dt: number) {
           b.did++;
           const ox = b.did % 3 === 0 ? 0 : rnd(-9, 9);
           const oz = b.did % 3 === 0 ? 0 : rnd(-9, 9);
-          let mx = p.pos.x + ox;
-          let mz = p.pos.z + oz;
+          let mx = targetPos.x + ox;
+          let mz = targetPos.z + oz;
           const rr = Math.hypot(mx, mz);
           if (rr > ARENA_R - 4) {
             mx *= (ARENA_R - 4) / rr;
@@ -3091,9 +3111,9 @@ private updatePlayerPose(dt: number) {
           }
           b.walk += dt * 30;
           if (Math.random() < 0.8) this.fx.spawn(b.pos.x + rnd(-1.5, 1.5), 0.3, b.pos.z + rnd(-1.5, 1.5), rnd(-3, 3), rnd(1, 4), rnd(-3, 3), 0.5, 0.35, new THREE.Color(1.5, 0.7, 2.0));
-          if (!b.did && Math.hypot(dx, dz) < 4.6 && p.pos.y < 7) {
+          if (!b.did && Math.hypot(dx, dz) < 4.6 && targetPos.y < 7) {
             b.did = 1;
-            this.damagePlayer(p2 ? 38 : 32, b.pos, "melee");
+            this.damageBossTarget(p2 ? 38 : 32, b.pos, "melee");
           }
         } else {
           bp.lean = 0.35;
@@ -3109,7 +3129,7 @@ private updatePlayerPose(dt: number) {
         bp.shR = 0.2;
         bp.lean = -0.12;
         const g = this.gauntletPos(this.v1);
-        const aim = this.v2.set(p.pos.x, p.pos.y + 1.1, p.pos.z).sub(g).normalize();
+        const aim = this.v2.set(targetPos.x, targetPos.y + 1.1, targetPos.z).sub(g).normalize();
         if (b.t < 1.1) {
           this.turnBoss(dt, 3.5);
           b.bdir.lerp(aim, Math.min(1, dt * 6)).normalize();
@@ -3122,13 +3142,13 @@ private updatePlayerPose(dt: number) {
           if (b.bdir.y < -0.001) len = Math.min(len, g.y / -b.bdir.y);
           b.bend.copy(g).addScaledVector(b.bdir, len);
           if (live) {
-            const chestP = this.v3.set(p.pos.x, p.pos.y + 1.1, p.pos.z);
+            const chestP = this.v3.set(targetPos.x, targetPos.y + 1.1, targetPos.z);
             const seg = this.tC.copy(b.bend).sub(g);
             const L2 = Math.max(0.0001, seg.lengthSq());
             const tt = clamp(chestP.clone().sub(g).dot(seg) / L2, 0, 1);
             const closest = g.clone().addScaledVector(seg, tt);
             if (closest.distanceTo(chestP) < 1.8) {
-              if (p.absorbing && this.nano.ready && !this.suit.active) {
+              if (target.id === this.networkPlayerId && p.absorbing && this.nano.ready && !this.suit.active) {
                 // Lightning Refocus drinks the beam
                 p.refocus = Math.min(1, p.refocus + dt * 0.75);
                 p.ult = Math.min(100, p.ult + dt * 8);
@@ -3138,7 +3158,7 @@ private updatePlayerPose(dt: number) {
                 b.btick -= dt;
                 if (b.btick <= 0) {
                   b.btick = 0.3;
-                  this.damagePlayer(p2 ? 20 : 16, g, "proj");
+                  this.damageBossTarget(p2 ? 20 : 16, g, "proj");
                 }
               }
             }
