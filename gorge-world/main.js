@@ -185,7 +185,7 @@ window.addEventListener("blur", () => {
 });
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (!isPlaying || event.pointerType === "touch") return;
+  if (!isPlaying) return;
   dragging = true;
   previousPointer = { x: event.clientX, y: event.clientY };
   canvas.setPointerCapture(event.pointerId);
