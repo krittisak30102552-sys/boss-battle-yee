@@ -90,7 +90,7 @@ export const WEAPON_INFO: WeaponInfo[] = [
 /* ------------------------------------------------------------------ */
 
 const ARENA_R = 58;
-const BOSS_MAX = 3000;
+const BOSS_MAX = 1_000_000;
 const PLAYER_MAX = 250;
 const TONY_MAX = 250;
 const TAU = Math.PI * 2;
@@ -2912,6 +2912,8 @@ private updatePlayerPose(dt: number) {
     else this.combatEventSender?.({ type:"playerHit", x:point.x,y:point.y,z:point.z,dmg:amount,targetId:target.id,hitKind:kind });
   }
   private updateBoss(dt: number) {
+    // In co-op, only the room host runs boss AI and attack timing. Other clients render host snapshots.
+    if (!this.bossAuthority) return;
     const b = this.boss;
     const p = this.pl;
     const target = this.getBossTarget();
