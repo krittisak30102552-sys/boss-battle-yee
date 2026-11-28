@@ -121,7 +121,8 @@ export class MultiplayerClient {
     return onChildAdded(ref(db, `rooms/${this.code}/battle/hits`), snap => {
       const v = snap.val();
       if (!v || ![v.amount,v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;
-      callback({ amount: Math.max(0, Math.min(500, v.amount)), point: { x:v.x, y:v.y, z:v.z } });\n      void remove(snap.ref);
+      callback({ amount: Math.max(0, Math.min(500, v.amount)), point: { x:v.x, y:v.y, z:v.z } });
+      void remove(snap.ref);
     });
   }
   async publishBossState(state: BossNetworkState) {
