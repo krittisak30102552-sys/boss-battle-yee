@@ -4,7 +4,7 @@ import { buildIronMan, buildThanos, setFlash, IronRig, ThanosRig, THANOS_SCALE }
 import { NanoSystem, WEAPON_COUNT } from "./nano";
 import { SuitSystem } from "./suit";
 import { initAudio, sfx } from "./audio";
-import type { BossNetworkState } from "./multiplayer";
+import type { BossNetworkState, CombatNetworkEvent } from "./multiplayer";
 
 const RED_C = 0xb5141f;
 const GOLD_C = 0xe9b13a;
@@ -225,6 +225,7 @@ interface Proj {
   power: number;
   homing?: boolean;
   age?: number;
+  networkVisual?: boolean;
 }
 
 interface Sentry {
@@ -1509,7 +1510,7 @@ touchLook(dx: number, dy: number) {
     mesh.position.copy(m);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
     this.scene.add(mesh);
-    this.projs.push({ mesh, vel: dir.clone().multiplyScalar(95), life: 1.5, dmg: 14, owner: "p", r: 0.3, kind: "bolt", power: 0 });
+    this.addProjectile({ mesh, vel: dir.clone().multiplyScalar(95), life: 1.5, dmg: 14, owner: "p", r: 0.3, kind: "bolt", power: 0 });
     p.cd = 0.16;
     p.aimT = 0.6;
     p.aimPitch = Math.asin(clamp(dir.y, -1, 1));
@@ -2586,7 +2587,7 @@ private updatePlayerPose(dt: number) {
         this.explode(pos, pr.kind === "cannon" ? 0.5 : 0.1, tc);
       }
 
-      if (!remove && pr.owner === "p") {
+      if (!remove && pr.owner === "p" && !pr.networkVisual) {
         const b = this.boss;
         if (b.state !== "dead" && this.bossDist(pos) < pr.r + 2.0) {
           const dead = this.damageBoss(pr.dmg, pos);
@@ -2649,6 +2650,7 @@ private updatePlayerPose(dt: number) {
     m.scale.set(1, 1, 1);
     this.scene.add(m);
     this.shocks.push({ mesh: m, r: 1, speed, hit: false, dmg });
+    if (this.bossAuthority && !this.receivingCombatEvent) this.combatEventSender?.({ type:"shock", x, y:0.7, z, speed, dmg });
   }
 
   private removeShock(s: Shock) {
@@ -2700,6 +2702,7 @@ private updatePlayerPose(dt: number) {
     rock.visible = false;
     this.scene.add(rock);
     this.meteors.push({ pos: new THREE.Vector3(x, 0, z), t: 0, ring, rock, done: false });
+    if (this.bossAuthority && !this.receivingCombatEvent) this.combatEventSender?.({ type:"meteor", x, y:0, z });
     sfx.warn();
   }
 
@@ -2744,6 +2747,30 @@ private updatePlayerPose(dt: number) {
 
   private bossAuthority = true;
   private networkBossDamageSender: ((amount: number, point: { x: number; y: number; z: number }) => void) | null = null;
+  private combatEventSender: ((event: CombatNetworkEvent) => void) | null = null;
+  private receivingCombatEvent = false;
+  setCombatEventSender(sender: ((event: CombatNetworkEvent) => void) | null) { this.combatEventSender = sender; }
+  private addProjectile(projectile: Proj) {
+    this.projs.push(projectile);
+    if (projectile.owner === "p" && !projectile.networkVisual) this.combatEventSender?.({ type:"projectile", owner:"p", kind:projectile.kind, x:projectile.mesh.position.x, y:projectile.mesh.position.y, z:projectile.mesh.position.z, vx:projectile.vel.x, vy:projectile.vel.y, vz:projectile.vel.z, life:projectile.life, dmg:projectile.dmg, radius:projectile.r, power:projectile.power });
+  }
+  applyNetworkCombatEvent(event: CombatNetworkEvent) {
+    this.receivingCombatEvent = true;
+    try {
+      if (event.type === "projectile") {
+        const kind = event.kind || "bolt";
+        const mesh = kind === "bolt" || kind === "missile" ? new THREE.Mesh(this.boltGeo, this.boltMat) : new THREE.Group();
+        if (kind === "orb") { const core=new THREE.Mesh(this.sphereGeo,this.orbCore); const shell=new THREE.Mesh(this.sphereGeo,this.orbShell); shell.scale.setScalar(1.6); mesh.add(core,shell); }
+        else if (kind === "cannon" || kind === "refocus") { const core=new THREE.Mesh(this.sphereGeo,this.canCore); const shell=new THREE.Mesh(this.sphereGeo,this.canShell); shell.scale.setScalar(1.7); mesh.add(core,shell); }
+        mesh.position.set(event.x,event.y,event.z);
+        const vel=new THREE.Vector3(event.vx||0,event.vy||0,event.vz||0);
+        if (vel.lengthSq()>0) mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),vel.clone().normalize());
+        this.scene.add(mesh);
+        this.projs.push({ mesh, vel, life:Math.max(0.1,Math.min(10,event.life||2)), dmg:Math.max(0,event.dmg||0), owner:event.owner==="b"?"b":"p", r:Math.max(0.1,event.radius||0.3), kind, power:event.power||0, networkVisual:event.owner!=="b" });
+      } else if (event.type === "shock") this.spawnShock(event.x,event.z,event.speed||18,event.dmg||30);
+      else if (event.type === "meteor") this.addMeteor(event.x,event.z);
+    } finally { this.receivingCombatEvent = false; }
+  }
   setBossAuthority(authority: boolean) { this.bossAuthority = authority; }
   setNetworkBossDamageSender(sender: ((amount: number, point: { x: number; y: number; z: number }) => void) | null) {
     this.networkBossDamageSender = sender;
