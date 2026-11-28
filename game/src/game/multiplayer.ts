@@ -170,7 +170,7 @@ export class MultiplayerClient {
       if (!v || ![v.x,v.y,v.z,v.yaw,v.hp,v.phase,v.t,v.walk,v.flash,v.think,v.did].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) {
         callback(null); return;
       }
-      callback({ x:v.x,y:v.y,z:v.z,yaw:v.yaw,hp:Math.max(0,Math.min(3000,v.hp)),phase:v.phase,state:String(v.state || "idle"),t:v.t,walk:v.walk,flash:v.flash,think:v.think,did:v.did,updatedAt:Number(v.updatedAt)||0 });
+      callback({ x:v.x,y:v.y,z:v.z,yaw:v.yaw,hp:Math.max(0,Math.min(1_000_000,v.hp)),phase:v.phase,state:String(v.state || "idle"),t:v.t,walk:v.walk,flash:v.flash,think:v.think,did:v.did,updatedAt:Number(v.updatedAt)||0 });
     });
   }
   async updateState(state: PlayerState) {
