@@ -137,7 +137,7 @@ export class MultiplayerClient {
     return onChildAdded(ref(db, `rooms/${this.code}/battle/events`), snap => {
       const v = snap.val();
       if (!v || v.by === uid || Date.now() - Number(v.at || 0) > 15000) return;
-      if (!["projectile", "shock", "meteor"].includes(v.type) || ![v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;
+      if (!["projectile", "shock", "meteor", "playerHit"].includes(v.type) || ![v.x,v.y,v.z].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) return;
       callback(v as CombatNetworkEvent);
     });
   }
