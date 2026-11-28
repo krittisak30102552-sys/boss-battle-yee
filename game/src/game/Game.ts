@@ -1494,7 +1494,7 @@ touchLook(dx: number, dy: number) {
   private mark50Pulse() {
     this.pl.cd = 0.12;
     const c = new THREE.Color(0.35, 2.8, 4);
-    this.mark50Hit(420, c, "MARK 50 · PHOTON REPULSOR");
+    this.mark50Hit(1_200, c, "MARK 50 · PHOTON REPULSOR");
   }
 
   private mark50Nova() {
@@ -1503,7 +1503,7 @@ touchLook(dx: number, dy: number) {
     const c = new THREE.Color(0.3, 2.2, 4);
     this.spawnRing(p.pos.x, 0.35, p.pos.z, c, 38, 34);
     this.spawnRing(p.pos.x, 0.5, p.pos.z, new THREE.Color(1.2, 1.8, 3), 25, 26);
-    this.mark50Hit(1_800, c, "MARK 50 · NOVA PULSE", 1.0);
+    this.mark50Hit(4_000, c, "MARK 50 · NOVA PULSE", 1.0);
   }
 
   private mark50ArcLance() {
@@ -1516,7 +1516,7 @@ touchLook(dx: number, dy: number) {
       const from = hand.getWorldPosition(new THREE.Vector3());
       this.spawnFlash(from, to, c, 0.18, 0.38);
     }
-    this.mark50Hit(2_200, c, "MARK 50 · ARC LANCE", 0.5);
+    this.mark50Hit(5_000, c, "MARK 50 · ARC LANCE", 0.5);
   }
 
   private mark50DroneSwarm() {
@@ -1529,7 +1529,7 @@ touchLook(dx: number, dy: number) {
       const to = new THREE.Vector3(b.pos.x + rnd(-2.5, 2.5), b.pos.y + rnd(2, 6), b.pos.z + rnd(-2.5, 2.5));
       this.spawnFlash(from, to, c, 0.055, 0.24);
       this.fx.spawn(from.x, from.y, from.z, rnd(-5, 5), rnd(1, 7), rnd(-5, 5), 0.45, 0.2, c);
-      this.damageBoss(480, to);
+      this.damageBoss(1_200, to);
     }
     this.shake = Math.max(this.shake, 0.65);
     this.say("MARK 50 · AUTONOMOUS DRONE SWARM", 1.5);
@@ -1544,22 +1544,22 @@ touchLook(dx: number, dy: number) {
       return;
     }
     p.cd = 12;
-    p.hp = Math.min(PLAYER_MAX, p.hp + 5_000);
-    p.invul = Math.max(p.invul, 1.4);
+    p.hp = Math.min(PLAYER_MAX, p.hp + 10_000);
+    p.invul = Math.max(p.invul, 2.2);
     const c = new THREE.Color(0.3, 3, 1.8);
     this.spawnRing(p.pos.x, 0.3, p.pos.z, c, 18, 12);
     for (let i = 0; i < 70; i++) {
       const a = Math.random() * TAU;
       this.fx.spawn(p.pos.x + Math.cos(a) * rnd(0.5, 2.5), p.pos.y + rnd(0, 3), p.pos.z + Math.sin(a) * rnd(0.5, 2.5), rnd(-2, 2), rnd(1, 5), rnd(-2, 2), 0.55, 0.16, c);
     }
-    this.say("MARK 50 · NANO RECONSTRUCTION +5,000 HP", 1.8);
+    this.say("MARK 50 · NANO RECONSTRUCTION +10,000 HP", 1.8);
     sfx.heal();
   }
 
   private mark50Overdrive() {
     this.pl.cd = 8;
     const c = new THREE.Color(2.4, 0.8, 3.2);
-    this.mark50Hit(4_000, c, "MARK 50 · PRIME OVERDRIVE", 1.6);
+    this.mark50Hit(8_000, c, "MARK 50 · PRIME OVERDRIVE", 1.6);
     this.spawnRing(this.boss.pos.x, 0.3, this.boss.pos.z, c, 42, 28);
   }
 
@@ -1572,7 +1572,7 @@ touchLook(dx: number, dy: number) {
     for (let i = 0; i < 6; i++) {
       const from = (i % 2 ? this.rig.handL : this.rig.handR).getWorldPosition(new THREE.Vector3());
       this.spawnFlash(from, point, c, 0.09 + i * 0.01, 0.2 + i * 0.025);
-      this.damageBoss(650, point);
+      this.damageBoss(1_200, point);
     }
     this.say("MARK 50 · NANO BLADE STORM", 1.1);
     sfx.slash();
@@ -1582,7 +1582,7 @@ touchLook(dx: number, dy: number) {
     this.pl.cd = 3;
     const b = this.boss;
     const c = new THREE.Color(1.8, 1.0, 3.2);
-    this.mark50Hit(5_000, c, "MARK 50 · GRAVITY BREAKER", 2.0);
+    this.mark50Hit(10_000, c, "MARK 50 · GRAVITY BREAKER", 2.0);
     this.spawnRing(b.pos.x, 0.25, b.pos.z, c, 55, 30);
   }
 
@@ -1595,7 +1595,7 @@ touchLook(dx: number, dy: number) {
       const from = (i % 2 ? this.rig.handL : this.rig.handR).getWorldPosition(new THREE.Vector3());
       const to = new THREE.Vector3(b.pos.x + rnd(-3, 3), b.pos.y + rnd(1, 7), b.pos.z + rnd(-3, 3));
       this.spawnFlash(from, to, c, 0.07, 0.3);
-      this.damageBoss(500, to);
+      this.damageBoss(1_000, to);
     }
     this.shake = Math.max(this.shake, 0.8);
     this.say("MARK 50 · HYPER MISSILE BARRAGE", 1.5);
@@ -1615,7 +1615,7 @@ touchLook(dx: number, dy: number) {
     this.shocks = [];
     this.spawnRing(p.pos.x, 0.3, p.pos.z, c, 75, 100);
     this.spawnRing(b.pos.x, 0.4, b.pos.z, new THREE.Color(0.4, 2.8, 4), 48, 42);
-    this.mark50Hit(10_000, c, "MARK 50 · PRIME SINGULARITY", 3.0);
+    this.mark50Hit(20_000, c, "MARK 50 · PRIME SINGULARITY", 3.0);
   }
 
   private heal() {
