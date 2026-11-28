@@ -5,8 +5,8 @@ import { MultiplayerClient, RoomInfo, RoomMode } from "./game/multiplayer";
 
 const INITIAL: HudState = {
   status: "menu",
-  playerHp: 250,
-  playerMax: 250,
+  playerHp: 20_000,
+  playerMax: 20_000,
   tonyExposed: false,
   bossHp: 50000,
   bossMax: 50000,
@@ -43,6 +43,20 @@ const INITIAL: HudState = {
   diving: false,
   bossSkin: "titan",
 };
+
+const MARK50_WEAPON_INFO = [
+  { key: "1", code: "Digit1", name: "PHOTON REPULSOR", th: "โฟตอนบลาสต์", short: "โฟตอน", desc: "ยิงโฟตอนความถี่สูงต่อเนื่อง ดาเมจ 420 ต่อช็อต" },
+  { key: "2", code: "Digit2", name: "NOVA PULSE", th: "คลื่นโนวา", short: "โนวา", desc: "ปล่อยคลื่นพลังงานวงกว้าง สร้างความเสียหาย 1,800 และทำให้บอสชะงัก" },
+  { key: "3", code: "Digit3", name: "ARC LANCE", th: "อาร์คแลนซ์", short: "อาร์ค", desc: "ยิงลำแสงคู่จากมือทั้งสอง ดาเมจ 2,200" },
+  { key: "4", code: "Digit4", name: "DRONE SWARM", th: "ฝูงโดรน", short: "โดรน", desc: "ปล่อยโดรนนาโน 10 ลำโจมตีพร้อมกัน รวม 4,800 ดาเมจ" },
+  { key: "5", code: "Digit5", name: "NANO RECONSTRUCTION", th: "ซ่อมเกราะ", short: "ซ่อม", desc: "ฟื้นฟูเกราะ 5,000 HP และอมตะชั่วครู่ · คูลดาวน์ 12 วิ" },
+  { key: "6", code: "Digit6", name: "PRIME OVERDRIVE", th: "โอเวอร์ไดรฟ์", short: "โอเวอร์", desc: "อัดพลังอาร์คเต็มกำลัง ดาเมจ 4,000 และทำให้บอสชะงัก" },
+  { key: "7", code: "Digit7", name: "NANO BLADE STORM", th: "พายุใบมีด", short: "ใบมีด", desc: "ฟันต่อเนื่อง 6 จังหวะ รวม 3,900 ดาเมจ" },
+  { key: "8", code: "Digit8", name: "GRAVITY BREAKER", th: "ค้อนแรงโน้มถ่วง", short: "ค้อน", desc: "ทุบพลังงานแรงโน้มถ่วง ดาเมจ 5,000 และหยุดบอส" },
+  { key: "9", code: "Digit9", name: "HYPER MISSILE BARRAGE", th: "มิสไซล์ถล่ม", short: "มิสไซล์", desc: "ยิงมิสไซล์นำวิถี 12 ลูก รวม 6,000 ดาเมจ" },
+  { key: "0", code: "Digit0", name: "AEGIS REFLECTOR", th: "โล่เอจิส", short: "โล่", desc: "กดค้างเพื่อกางโล่พลังงานและปัดป้องการโจมตีด้านหน้า" },
+  { key: "G", code: "KeyG", name: "PRIME SINGULARITY", th: "ไพรม์ซิงกูลาริตี", short: "ซิงกูลาร์", desc: "ท่าไม้ตาย ล้างกระสุน/อุกกาบาตของบอส ดาเมจ 10,000 และหยุดบอส · คูลดาวน์ 12 วิ" },
+] as const;
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
@@ -96,7 +110,8 @@ export default function App() {
   const mpRoomRef = useRef<RoomInfo | null>(null);
     const [combatMode, setCombatMode] = useState<0 | 1>(0);
     const armorModel = hud.armorModel;
-    const visibleWeapons = combatMode === 0 ? WEAPON_INFO.slice(0, 6) : WEAPON_INFO.slice(6);
+    const skillSet = armorModel === 50 ? MARK50_WEAPON_INFO : WEAPON_INFO;
+    const visibleWeapons = combatMode === 0 ? skillSet.slice(0, 6) : skillSet.slice(6);
     const switchCombatMode = () => {
       const next = combatMode === 0 ? 1 : 0;
       setCombatMode(next);
@@ -412,7 +427,7 @@ useEffect(() => {
             <>
             {/* current form + skill bar */}
             <div className="absolute bottom-[82px] left-1/2 -translate-x-1/2 rounded-md border border-cyan-300/40 bg-slate-950/85 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.18)]">
-              {combatMode === 1 ? "FORM 2 · NANO WINGS DEPLOYED" : "FORM 1 · STANDARD CONFIG"}
+              {armorModel === 50 ? (combatMode === 1 ? "MARK 50 · PRIME FORM 2" : "MARK 50 · PRIME CONFIG") : (combatMode === 1 ? "FORM 2 · NANO WINGS DEPLOYED" : "FORM 1 · STANDARD CONFIG")}
             </div>
             {/* weapons */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex w-[calc(100%-1rem)] max-w-[720px] justify-center gap-1 sm:gap-2">
@@ -548,7 +563,7 @@ useEffect(() => {
             <div className="pointer-events-auto absolute right-4 top-16 z-[90] w-64 rounded-2xl border border-cyan-300/40 bg-slate-950/95 p-4 text-white shadow-2xl">
               <div className="mb-3 text-sm font-black text-cyan-200">ตั้งค่าการควบคุม</div>
               <div className="mb-3 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                MARK 85 · Mark 50 จะเรียกใช้ได้เมื่อ Mark 85 พัง
+                MARK 85 · เมื่อเกราะพังจะเรียก MARK 50 PRIME พร้อมชุดสกิลใหม่
               </div>
               <button type="button"
                 onClick={() => { setDeviceMode((v) => v === "mobile" ? "desktop" : "mobile"); setSettingsOpen(false); }}
