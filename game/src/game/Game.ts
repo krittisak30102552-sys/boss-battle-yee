@@ -817,11 +817,17 @@ private nano: NanoSystem;
       if (![s.x,s.y,s.z,s.heading].every(Number.isFinite)) continue;
       let remote = this.remoteRigs.get(player.id);
       if (!remote) {
-        const rig = buildIronMan();
-        rig.root.scale.setScalar(0.92);
-        this.scene.add(rig.root);
-        remote = { rig, target: new THREE.Vector3(s.x,s.y,s.z), heading: s.heading };
-        this.remoteRigs.set(player.id, remote);
+        // A remote pilot must never be allowed to break the local render loop.
+        try {
+          const rig = buildIronMan();
+          rig.root.scale.setScalar(0.92);
+          this.scene.add(rig.root);
+          remote = { rig, target: new THREE.Vector3(s.x,s.y,s.z), heading: s.heading };
+          this.remoteRigs.set(player.id, remote);
+        } catch (error) {
+          console.warn("[multiplayer] Could not create remote pilot", player.id, error);
+          continue;
+        }
       }
       remote.target.set(THREE.MathUtils.clamp(s.x,-60,60), THREE.MathUtils.clamp(s.y,0,30), THREE.MathUtils.clamp(s.z,-60,60));
       remote.heading = s.heading;
