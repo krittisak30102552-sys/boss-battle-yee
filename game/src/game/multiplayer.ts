@@ -6,7 +6,8 @@ export type RoomMode = "coop" | "freeroam";
 export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }
 export interface BossNetworkState { x:number; y:number; z:number; yaw:number; hp:number; phase:number; state:string; t:number; walk:number; flash:number; think:number; did:number; updatedAt:number; }
 export interface CombatNetworkEvent {
-  type: "projectile" | "shock" | "meteor";
+  type: "projectile" | "shock" | "meteor" | "playerHit";
+  targetId?: string; hitKind?: "melee" | "wave" | "proj";
   owner?: "p" | "b";
   kind?: "bolt" | "orb" | "cannon" | "missile" | "refocus";
   x: number; y: number; z: number;
