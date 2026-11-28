@@ -4,7 +4,7 @@ import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, update, p
 
 export type RoomMode = "coop" | "freeroam";
 export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }
-export interface BossNetworkState { x:number; y:number; z:number; yaw:number; hp:number; phase:number; state:string; t:number; walk:number; flash:number; think:number; did:number; shR?:number; elR?:number; shL?:number; elL?:number; lean?:number; crouch?:number; headX?:number; fall?:number; updatedAt:number; }
+export interface BossNetworkState { x:number; y:number; z:number; yaw:number; hp:number; phase:number; state:string; t:number; walk:number; flash:number; think:number; did:number; shR?:number; elR?:number; shL?:number; elL?:number; lean?:number; crouch?:number; headX?:number; fall?:number; bdirX?:number; bdirY?:number; bdirZ?:number; bendX?:number; bendY?:number; bendZ?:number; updatedAt:number; }
 export interface CombatNetworkEvent {
   type: "projectile" | "shock" | "meteor" | "playerHit";
   targetId?: string; hitKind?: "melee" | "wave" | "proj";
@@ -170,7 +170,7 @@ export class MultiplayerClient {
       if (!v || ![v.x,v.y,v.z,v.yaw,v.hp,v.phase,v.t,v.walk,v.flash,v.think,v.did].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) {
         callback(null); return;
       }
-      callback({ x:v.x,y:v.y,z:v.z,yaw:v.yaw,hp:Math.max(0,Math.min(100_000,v.hp)),phase:v.phase,state:String(v.state || "idle"),t:v.t,walk:v.walk,flash:v.flash,think:v.think,did:v.did,shR:Number(v.shR)||0,elR:Number.isFinite(v.elR)?v.elR:-0.2,shL:Number(v.shL)||0,elL:Number.isFinite(v.elL)?v.elL:-0.2,lean:Number(v.lean)||0,crouch:Number(v.crouch)||0,headX:Number(v.headX)||0,fall:Number(v.fall)||0,updatedAt:Number(v.updatedAt)||0 });
+      callback({ x:v.x,y:v.y,z:v.z,yaw:v.yaw,hp:Math.max(0,Math.min(50_000,v.hp)),phase:v.phase,state:String(v.state || "idle"),t:v.t,walk:v.walk,flash:v.flash,think:v.think,did:v.did,shR:Number(v.shR)||0,elR:Number.isFinite(v.elR)?v.elR:-0.2,shL:Number(v.shL)||0,elL:Number.isFinite(v.elL)?v.elL:-0.2,lean:Number(v.lean)||0,crouch:Number(v.crouch)||0,headX:Number(v.headX)||0,fall:Number(v.fall)||0,bdirX:Number(v.bdirX)||0,bdirY:Number(v.bdirY)||0,bdirZ:Number(v.bdirZ)||0,bendX:Number(v.bendX)||0,bendY:Number(v.bendY)||0,bendZ:Number(v.bendZ)||0,updatedAt:Number(v.updatedAt)||0 });
     });
   }
   async updateState(state: PlayerState) {
