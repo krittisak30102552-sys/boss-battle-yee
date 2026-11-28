@@ -4,6 +4,7 @@ import { getDatabase, ref, get, onValue, runTransaction, onDisconnect, update, t
 
 export type RoomMode = "coop" | "freeroam";
 export interface PlayerState { x: number; y: number; z: number; heading: number; flying: boolean; }
+export interface BossNetworkState { x:number; y:number; z:number; yaw:number; hp:number; phase:number; state:string; t:number; walk:number; flash:number; think:number; did:number; updatedAt:number; }
 export interface RoomPlayer { id: string; name: string; state: PlayerState | null; }
 export interface RoomInfo { code: string; mode: RoomMode; hostId: string; players: RoomPlayer[]; started?: boolean; }
 
@@ -107,6 +108,22 @@ export class MultiplayerClient {
     const raw = result.snapshot.val();
     const players = Object.entries(raw.players || {}).map(([id, p]: [string, any]) => ({ id, name: p.name, state: null as null }));
     return { ok: true, room: { code, mode: raw.mode, hostId: raw.hostId, players, started: Boolean(raw.started) } };
+  }
+  async publishBossState(state: BossNetworkState) {
+    const { db } = this.require();
+    if (!this.code) return;
+    await update(ref(db, `rooms/${this.code}/battle`), { boss: { ...state, updatedAt: Date.now() } });
+  }
+  onBossUpdate(callback: (state: BossNetworkState | null) => void) {
+    const { db } = this.require();
+    if (!this.code) throw new Error("ยังไม่ได้อยู่ในห้อง");
+    return onValue(ref(db, `rooms/${this.code}/battle/boss`), snap => {
+      const v = snap.val();
+      if (!v || ![v.x,v.y,v.z,v.yaw,v.hp,v.phase,v.t,v.walk,v.flash,v.think,v.did].every((n: unknown) => typeof n === "number" && Number.isFinite(n))) {
+        callback(null); return;
+      }
+      callback({ x:v.x,y:v.y,z:v.z,yaw:v.yaw,hp:Math.max(0,Math.min(3000,v.hp)),phase:v.phase,state:String(v.state || "idle"),t:v.t,walk:v.walk,flash:v.flash,think:v.think,did:v.did,updatedAt:Number(v.updatedAt)||0 });
+    });
   }
   async updateState(state: PlayerState) {
     const { db, uid } = this.require();
