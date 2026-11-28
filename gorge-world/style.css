@@ -1,0 +1,49 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Noto Sans Thai", system-ui, sans-serif;
+  background: #101a20;
+  color: #f1f5f4;
+  font-synthesis: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+body { background: #101a20; }
+#game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hud { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 24px; }
+.brand { display: flex; gap: 11px; align-items: center; text-shadow: 0 2px 18px #0009; }
+.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: #c9eddb; color: #17392f; font-weight: 900; font-size: 21px; }
+.brand strong { display: block; font-size: 15px; letter-spacing: .22em; }
+.brand small { display: block; margin-top: 3px; color: #c3d2ce; font-size: 9px; letter-spacing: .16em; }
+.status-pill { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid #ffffff22; border-radius: 99px; background: #101a20a8; backdrop-filter: blur(12px); color: #d7e4df; font-size: 11px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #a9d8bc; box-shadow: 0 0 12px #a9d8bc; }
+.help-card { display: grid; gap: 7px; min-width: 154px; padding: 13px 15px; border: 1px solid #ffffff20; border-radius: 14px; background: #101a20a8; backdrop-filter: blur(12px); color: #c8d6d1; font-size: 10px; }
+.help-card b { color: #eff7f3; font-size: 11px; margin-bottom: 2px; }
+kbd { display: inline-block; min-width: 19px; padding: 2px 4px; margin-right: 2px; border: 1px solid #ffffff33; border-radius: 5px; background: #ffffff10; color: #fff; text-align: center; font: inherit; }
+.welcome { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 22px; background: linear-gradient(120deg, #0b151ac9, #0b151a56); }
+.welcome-card { width: min(440px, 100%); padding: 34px; border: 1px solid #d5eee022; border-radius: 23px; background: #101c21e8; box-shadow: 0 28px 90px #0008; backdrop-filter: blur(20px); }
+.eyebrow { color: #a6c9b9; font-size: 9px; letter-spacing: .24em; font-weight: 700; }
+h1 { margin: 13px 0 3px; color: #f1f6f2; font-size: clamp(50px, 12vw, 74px); line-height: 1; letter-spacing: -.07em; }
+h1 span { color: #a9d8bc; }
+.welcome-card > p { color: #bac9c3; font-size: 13px; line-height: 1.6; }
+.loading-line { height: 5px; overflow: hidden; margin-top: 26px; border-radius: 99px; background: #ffffff18; }
+.loading-line i { display: block; width: 0; height: 100%; border-radius: inherit; background: #a9d8bc; transition: width .2s ease; }
+.loading-message { min-height: 20px; margin: 10px 0 18px; font-size: 11px !important; color: #d5e2dc !important; }
+#start-button { width: 100%; padding: 14px 18px; border: 0; border-radius: 12px; background: #b6e2ca; color: #11271e; font-weight: 800; cursor: pointer; transition: transform .15s, opacity .15s; }
+#start-button:hover:not(:disabled) { transform: translateY(-2px); }
+#start-button:disabled { opacity: .4; cursor: wait; }
+.fine-print { margin: 13px 0 0 !important; text-align: center; font-size: 10px !important; color: #91a49b !important; }
+.map-error { position: fixed; z-index: 8; left: 50%; bottom: 24px; width: min(560px, calc(100% - 32px)); transform: translateX(-50%); padding: 15px 18px; border: 1px solid #f0bb8055; border-radius: 14px; background: #30251deF; box-shadow: 0 12px 40px #0008; color: #ffe7c9; font-size: 12px; }
+.map-error p { margin: 7px 0 0; line-height: 1.6; color: #e8d4bf; }
+.map-error code { color: #fff1db; }
+.touch-controls { position: fixed; z-index: 4; inset: auto 0 22px; display: none; justify-content: space-between; align-items: end; padding: 0 24px; pointer-events: none; }
+.stick-zone { width: 116px; height: 116px; border: 1px solid #ffffff55; border-radius: 50%; background: #101a2066; backdrop-filter: blur(8px); pointer-events: auto; touch-action: none; display: grid; place-items: center; }
+.stick-knob { width: 48px; height: 48px; border: 1px solid #ffffff55; border-radius: 50%; background: #c5e8d5bb; box-shadow: 0 4px 18px #0005; }
+.jump-button { width: 68px; height: 68px; border: 1px solid #ffffff55; border-radius: 50%; background: #c5e8d5d9; color: #12352a; font-weight: 900; font-size: 11px; pointer-events: auto; touch-action: none; }
+@media (max-width: 760px) {
+  .hud { padding: 14px; }
+  .help-card { display: none; }
+  .brand-mark { width: 32px; height: 32px; }
+  .status-pill { max-width: 145px; padding: 8px 10px; font-size: 9px; }
+  .touch-controls { display: flex; }
+  .welcome-card { padding: 27px 23px; }
+}
