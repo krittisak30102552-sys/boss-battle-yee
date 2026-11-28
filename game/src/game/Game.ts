@@ -2763,7 +2763,7 @@ private updatePlayerPose(dt: number) {
     sfx.hit();
     const c = new THREE.Color(2.2, 1.8, 2.8);
     for (let i = 0; i < 4; i++) this.fx.spawn(point.x, point.y, point.z, rnd(-5, 5), rnd(-1, 6), rnd(-5, 5), 0.3, 0.16, c);
-    if (b.hp <= 0) {
+    if (this.bossAuthority && b.hp <= 0) {
       b.hp = 0;
       b.state = "dead";
       b.t = 0;
@@ -2776,7 +2776,7 @@ private updatePlayerPose(dt: number) {
       this.shake = 1;
       return true;
     }
-    if (b.phase === 1 && b.hp <= BOSS_MAX * 0.5) {
+    if (this.bossAuthority && b.phase === 1 && b.hp <= BOSS_MAX * 0.5) {
       b.phase = 2;
       b.state = "roar";
       b.t = 0;
