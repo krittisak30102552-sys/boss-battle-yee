@@ -5,8 +5,8 @@ import { MultiplayerClient, RoomInfo, RoomMode } from "./game/multiplayer";
 
 const INITIAL: HudState = {
   status: "menu",
-  playerHp: 20_000,
-  playerMax: 20_000,
+  playerHp: 300,
+  playerMax: 300,
   tonyExposed: false,
   bossHp: 50000,
   bossMax: 50000,
