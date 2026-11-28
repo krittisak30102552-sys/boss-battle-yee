@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Game, HudState, WEAPON_INFO } from "./game/Game";
-import { downloadSingleHtml, downloadSourceZip } from "./utils/download";
+import { THANOS_SKINS, ThanosSkin } from "./game/builders";
 import { MultiplayerClient, RoomInfo, RoomMode } from "./game/multiplayer";
 
 const INITIAL: HudState = {
@@ -34,6 +34,14 @@ const INITIAL: HudState = {
   mark50Available: false,
   mark50Cinematic: false,
   armorModel: 85,
+  flying: false,
+  fspeed: 0,
+  alt: 0,
+  afterburner: false,
+  diveCd: 0,
+  rollCd: 0,
+  diving: false,
+  bossSkin: "titan",
 };
 
 const fmt = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
@@ -46,38 +54,17 @@ function Bar({ value, max, color, h = "h-3" }: { value: number; max: number; col
   );
 }
 
-function DownloadButtons({ compact = false }: { compact?: boolean }) {
-  const [busy, setBusy] = useState(false);
-  const run = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    try {
-      await fn();
-    } finally {
-      setBusy(false);
-    }
-  };
-  const base =
-    "pointer-events-auto cursor-pointer border font-bold tracking-wide transition hover:brightness-125 disabled:opacity-50 " +
-    (compact ? "px-3 py-1.5 text-xs" : "px-5 py-3 text-sm");
-  return (
-    <div className={`flex ${compact ? "gap-2" : "gap-3 flex-wrap justify-center"}`}>
-      <button disabled={busy} onClick={() => run(downloadSourceZip)} className={`${base} border-cyan-300/60 bg-cyan-500/15 text-cyan-100`}>
-        ⬇ โค้ดเกม (.zip)
-      </button>
-      <button disabled={busy} onClick={() => run(downloadSingleHtml)} className={`${base} border-amber-300/60 bg-amber-500/15 text-amber-100`}>
-        ⬇ เกมไฟล์เดียว (.html)
-      </button>
-    </div>
-  );
-}
-
 const KEYS: Array<[string, string]> = [
   ["W A S D", "เดิน"],
   ["เมาส์", "หมุนกล้อง / เล็ง"],
   ["L", "เปิด / ปิดมุมมองอิสระ"],
   ["คลิกซ้าย", "ใช้อาวุธ"],
-  ["SPACE", "กระโดด / กดค้างเพื่อบิน"],
-  ["SHIFT", "Dash หลบ (อมตะชั่วขณะ)"],
+  ["SPACE", "กระโดด / กดค้างเพื่อลอย"],
+  ["F หรือ Space×2", "เปิด / ปิดโหมดบินอิสระ — บินตามทิศกล้อง"],
+  ["SPACE / C", "(ขณะบิน) บินขึ้น / บินลง"],
+  ["SHIFT", "Dash หลบ · ขณะบินกดค้าง = AFTERBURNER"],
+  ["A/D แตะ 2 ครั้ง", "(ขณะบิน) BARREL ROLL หลบอมตะ"],
+  ["X", "(ขณะบิน) METEOR DIVE พุ่งดิ่งใส่บอส"],
   ["1–9 / 0 / G / Q E / ล้อเมาส์", "เลือกอาวุธและสกิลนาโน"],
   ["V", "เข้า / ออกจาก FORM 2 · กางปีกอัตโนมัติ"],
   ["B", "กาง / พับปีกนาโน"],
@@ -95,6 +82,9 @@ export default function App() {
   const [chooseMode, setChooseMode] = useState(false);
   const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile" | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [skin, setSkin] = useState<ThanosSkin>("titan");
+  const skinInfo = THANOS_SKINS.find((k) => k.id === hud.bossSkin) ?? THANOS_SKINS[0];
+  const pickSkin = (id: ThanosSkin) => { setSkin(id); gameRef.current?.setBossSkin(id); };
   const [mp] = useState(() => new MultiplayerClient());
   const [mpName, setMpName] = useState("IRON PILOT");
   const [mpCode, setMpCode] = useState("");
@@ -305,20 +295,53 @@ useEffect(() => {
             />
           )}
 
+          {/* speed lines while flying fast */}
+          {hud.flying && hud.fspeed > 45 && (
+            <div
+              className="absolute inset-0"
+              style={{
+                opacity: Math.min(0.75, (hud.fspeed - 45) / 130 + (hud.afterburner ? 0.2 : 0)),
+                background: "repeating-conic-gradient(from 0deg at 50% 50%, rgba(190,235,255,0.0) 0deg 5deg, rgba(190,235,255,0.35) 5.4deg 5.8deg, rgba(190,235,255,0) 6.2deg 11deg)",
+                WebkitMaskImage: "radial-gradient(circle at 50% 50%, transparent 32%, black 78%)",
+                maskImage: "radial-gradient(circle at 50% 50%, transparent 32%, black 78%)",
+              }}
+            />
+          )}
+          {hud.diving && <div className="absolute inset-0" style={{ boxShadow: "inset 0 0 140px 30px rgba(255,140,40,0.55)" }} />}
+
           {/* boss bar */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[min(720px,88vw)]">
             <div className="flex items-end justify-between mb-1 px-1">
-              <div className="text-lg font-black tracking-[0.25em] text-purple-200 drop-shadow">THANOS</div>
+              <div className="text-lg font-black tracking-[0.25em] drop-shadow" style={{ color: skinInfo.color }}>THANOS <span className="text-[10px] tracking-[0.3em] text-white/50">· {skinInfo.name}</span></div>
               <div className="text-xs text-purple-200/80">
                 {hud.phase === 2 ? "PHASE II · RAGE" : "PHASE I"} · {hud.bossHp}/{hud.bossMax}
               </div>
             </div>
             <div className="relative">
-              <Bar value={hud.bossHp} max={hud.bossMax} color="linear-gradient(90deg,#7c3aed,#c026d3)" h="h-4" />
+              <Bar value={hud.bossHp} max={hud.bossMax} color={hud.bossSkin === "void" ? "linear-gradient(90deg,#7f1d1d,#ef4444)" : hud.bossSkin === "warlord" ? "linear-gradient(90deg,#1e40af,#fbbf24)" : "linear-gradient(90deg,#7c3aed,#c026d3)"} h="h-4" />
               <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white/60" />
             </div>
             <div className="h-7 mt-2 text-center text-sm font-bold text-amber-300 drop-shadow animate-pulse">{hud.action}</div>
           </div>
+
+          {/* mission hint */}
+          {hud.hint && (
+            <div className="absolute left-1/2 top-[112px] -translate-x-1/2 max-w-[min(640px,90vw)] border border-cyan-300/40 bg-slate-950/80 px-4 py-1.5 text-center text-xs font-bold text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.18)]">
+              {hud.hint}
+            </div>
+          )}
+
+          {/* flight instruments */}
+          {hud.flying && (
+            <div className="absolute right-4 top-[96px] w-40 border border-cyan-300/50 bg-slate-950/80 p-2 text-right shadow-[0_0_14px_rgba(34,211,238,0.18)]">
+              <div className="text-[10px] font-black tracking-[0.3em] text-cyan-200">{hud.afterburner ? "AFTERBURNER" : hud.diving ? "METEOR DIVE" : "FLIGHT MODE"}</div>
+              <div className="mt-1 flex items-end justify-end gap-1">
+                <span className={`text-3xl font-black leading-none ${hud.afterburner ? "text-amber-300" : "text-white"}`}>{hud.fspeed}</span>
+                <span className="text-[10px] font-bold text-white/60">กม./ชม.</span>
+              </div>
+              <div className="text-[11px] font-bold text-white/70">ALT {hud.alt} ม.</div>
+            </div>
+          )}
 
           {/* crosshair */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -370,6 +393,17 @@ useEffect(() => {
                   [SHIFT] Dash {hud.dashCd > 0 ? `${hud.dashCd.toFixed(1)}s` : "พร้อม"}
                 </div>
               </div>
+              <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                <div className={`px-2 py-1 border ${hud.flying ? "border-cyan-300 bg-cyan-500/25 text-cyan-100" : "border-white/25 text-white/70"} bg-black/50`}>
+                  [F] บิน {hud.flying ? "ON" : "OFF"}
+                </div>
+                <div className={`px-2 py-1 border ${!hud.flying ? "border-white/15 text-white/30" : hud.diveCd > 0 ? "border-white/20 text-white/40" : "border-amber-300/80 text-amber-200"} bg-black/50`}>
+                  [X] Meteor Dive {hud.diveCd > 0 ? `${Math.ceil(hud.diveCd)}s` : "พร้อม"}
+                </div>
+                <div className={`px-2 py-1 border ${!hud.flying ? "border-white/15 text-white/30" : hud.rollCd > 0 ? "border-white/20 text-white/40" : "border-emerald-300/70 text-emerald-200"} bg-black/50`}>
+                  [A·A / D·D] Roll {hud.rollCd > 0 ? `${hud.rollCd.toFixed(1)}s` : "พร้อม"}
+                </div>
+              </div>
               </>
             )}
           </div>
@@ -419,7 +453,7 @@ useEffect(() => {
           {/* top right */}
           <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
             <div className="text-sm font-bold text-white/80 bg-black/40 px-3 py-1 border border-white/10">⏱ {fmt(hud.time)}</div>
-            <DownloadButtons compact />
+            
           </div>
 
           {hud.status === "playing" && !hud.locked && (
@@ -485,6 +519,13 @@ useEffect(() => {
             onPointerCancel={() => { cameraTouchRef.current = null; }}
             onLostPointerCapture={() => { cameraTouchRef.current = null; }}
           />
+          <div className="pointer-events-auto absolute bottom-16 right-4 z-30 grid grid-cols-2 gap-2">
+            {holdKey("KeyF", "✈ บิน", "w-20 text-xs")}
+            {holdKey("KeyX", "⬇ DIVE", "w-20 text-xs")}
+            {holdKey("Space", "⇧ ขึ้น", "w-20 text-xs")}
+            {holdKey("KeyC", "⇩ ลง", "w-20 text-xs")}
+            {holdKey("ShiftLeft", "⚡ BOOST", "w-20 text-xs col-span-2 !w-full")}
+          </div>
           <div className="pointer-events-none absolute bottom-3 right-4 z-30 text-[10px] font-bold text-white/60">แตะพื้นที่ว่างแล้วลากเพื่อหมุนกล้อง</div>
         </>
       )}
@@ -542,7 +583,7 @@ useEffect(() => {
               <span className="text-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.2)]">IRON MAN</span>
               <span className="text-amber-300"> MK-85</span>
               <div className="text-2xl sm:text-3xl text-white/80 my-2 tracking-widest">VS</div>
-              <span className="text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.22)]">THANOS</span>
+              <span className="drop-shadow-[0_0_6px_rgba(168,85,247,0.22)]" style={{ color: skinInfo.color }}>THANOS</span>
             </h1>
             <div className="mt-4 inline-flex border border-amber-300/40 bg-black/50 px-4 py-2 text-xs font-black text-amber-100">
               MARK 85 · EMERGENCY RESERVE: MARK 50
@@ -552,6 +593,24 @@ useEffect(() => {
               <br />
               เปลี่ยนชุดได้อีกครั้งในเมนูตั้งค่าระหว่างเล่น
             </p>
+
+            <div className="mt-5 text-left">
+              <div className="mb-2 text-center text-[11px] font-black tracking-[0.35em] text-purple-200">เลือกสกินบอส · BOSS SKIN</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {THANOS_SKINS.map((k) => (
+                  <button key={k.id} type="button" onClick={() => pickSkin(k.id)}
+                    className={`cursor-pointer border-2 p-3 text-left transition hover:brightness-125 ${skin === k.id ? "bg-white/10" : "border-white/15 bg-black/50 opacity-80"}`}
+                    style={skin === k.id ? { borderColor: k.color, boxShadow: `0 0 18px ${k.color}66` } : undefined}>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-full" style={{ background: k.color, boxShadow: `0 0 8px ${k.color}` }} />
+                      <span className="text-[10px] font-black tracking-[0.2em]" style={{ color: k.color }}>{k.name}</span>
+                    </div>
+                    <div className="mt-1 text-sm font-black">{k.th}</div>
+                    <div className="text-[11px] leading-snug text-white/60">{k.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
               {WEAPON_INFO.map((w) => (
@@ -654,7 +713,7 @@ useEffect(() => {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 text-center px-4 pointer-events-auto">
           {hud.status === "won" ? (
             <>
-              <div className="text-amber-300 tracking-[0.4em] text-xs font-bold">THANOS DEFEATED</div>
+              <div className="text-amber-300 tracking-[0.4em] text-xs font-bold">THANOS · {skinInfo.name} DEFEATED</div>
               <div className="text-5xl sm:text-6xl font-black text-amber-300 drop-shadow-[0_0_30px_rgba(251,191,36,0.7)]">ชัยชนะ!</div>
               <p className="text-white/80 max-w-md">
                 “ฉันคือ Iron Man…” — คุณโค่นธานอสได้ภายในเวลา <b className="text-cyan-200">{fmt(hud.time)}</b>
@@ -669,6 +728,16 @@ useEffect(() => {
               </p>
             </>
           )}
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[10px] font-black tracking-[0.3em] text-white/50">BOSS SKIN</span>
+            {THANOS_SKINS.map((k) => (
+              <button key={k.id} type="button" onClick={() => pickSkin(k.id)}
+                className={`cursor-pointer border px-3 py-1.5 text-xs font-black transition hover:brightness-125 ${skin === k.id ? "bg-white/15" : "border-white/20 bg-black/50 text-white/70"}`}
+                style={skin === k.id ? { borderColor: k.color, color: k.color } : undefined}>
+                {k.th}
+              </button>
+            ))}
+          </div>
           <button
             onClick={() => gameRef.current?.start()}
             className="cursor-pointer mt-2 px-10 py-3 text-lg font-black tracking-widest bg-gradient-to-b from-red-500 to-red-700 border-2 border-amber-300 hover:scale-105 transition"

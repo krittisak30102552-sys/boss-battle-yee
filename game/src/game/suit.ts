@@ -184,8 +184,8 @@ const R_CLOSE = 0.45;
 const R_TOTAL = R_UNLOCK + R_SPREAD + R_PEEL + R_HOLD + R_CSPREAD + R_CLOSE;
 // put-on timeline
 const P_OPEN = 0.7;
-const P_CSPREAD = 0.6;
-const P_CLOSE = 0.5;
+export const P_CSPREAD = 0.6;
+export const P_CLOSE = 0.5;
 
 export class SuitSystem {
   active = false; // true while Tony is out of the armor

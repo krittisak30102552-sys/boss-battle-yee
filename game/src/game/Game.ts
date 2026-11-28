@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { buildIronMan, buildThanos, setFlash, IronRig, ThanosRig, THANOS_SCALE } from "./builders";
+import { buildIronMan, buildThanos, buildUltron, setFlash, IronRig, ThanosRig, UltronRig, THANOS_SCALE, THANOS_SKINS, ThanosSkin } from "./builders";
+export type { ThanosSkin } from "./builders";
 import { NanoSystem, WEAPON_COUNT } from "./nano";
 import { SuitSystem } from "./suit";
 import { initAudio, sfx } from "./audio";
@@ -46,6 +47,14 @@ export interface HudState {
   mark50Available: boolean;
   mark50Cinematic: boolean;
   armorModel: 50 | 85;
+  flying: boolean;
+  fspeed: number;
+  alt: number;
+  afterburner: boolean;
+  diveCd: number;
+  rollCd: number;
+  diving: boolean;
+  bossSkin: ThanosSkin;
 }
 
 export const W = {
@@ -392,7 +401,37 @@ private nano: NanoSystem;
     ramHit: false,
     wing: 0.35,
     snd: 0,
+    // flight
+    flying: false,
+    flyT: 0,
+    afterburner: false,
+    rollT: 0,
+    rollDir: 1,
+    rollCd: 0,
+    diveT: 0,
+    diveCd: 0,
+    diveHit: false,
+    diveStartY: 0,
+    diveDir: new THREE.Vector3(0, -1, 0),
+    lastSpace: -9,
+    lastA: -9,
+    lastD: -9,
   };
+  private fl = { pitch: 0, bank: 0 };
+  private tilted = false;
+  private camDist = 8.5;
+  private camRoll = 0;
+  private fv = new THREE.Vector3();
+  private ft = new THREE.Vector3();
+  private qA = new THREE.Quaternion();
+  private qB = new THREE.Quaternion();
+  private axX = new THREE.Vector3(1, 0, 0);
+  private axB = new THREE.Vector3();
+  private hipC = new THREE.Vector3(0, 1.15, 0);
+  private footFlames: THREE.Mesh[] = [];
+  private bossSkin: ThanosSkin = "titan";
+  private bossWind = 0;
+  private urig!: UltronRig;
   private hurtCount = 0;
   private hitCount = 0;
   private armPose = { shR: -0.5, elR: -0.9, shL: 0, elL: -0.3, zR: 0, zL: 0 };
@@ -423,7 +462,7 @@ private nano: NanoSystem;
     bend: new THREE.Vector3(),
   };
   private bpose = { shR: 0, elR: -0.2, shL: 0, elL: -0.2, lean: 0, crouch: 0, headX: 0, fall: 0 };
-  private ultron = new THREE.Group();
+  private ultron: THREE.Group = new THREE.Group();
   private ultronActive = false;
   private ultronFire = 2.5;
 
@@ -544,44 +583,42 @@ private nano: NanoSystem;
   private wingsManual = false;
 
   private buildUltron() {
-    const g = this.ultron;
-    const metal = new THREE.MeshStandardMaterial({ color: 0x9da8b5, metalness: 0.88, roughness: 0.24, emissive: 0x182b42, emissiveIntensity: 0.7 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x202b38, metalness: 0.8, roughness: 0.32 });
-    const red = new THREE.MeshBasicMaterial({ color: 0xff263c });
-    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x:number,y:number,z:number,sx=1,sy=1,sz=1) => {
-      const m = new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.scale.set(sx,sy,sz); m.castShadow=true; g.add(m); return m;
-    };
-    add(new THREE.BoxGeometry(1.15,1.25,0.55),metal,0,0,0);
-    add(new THREE.SphereGeometry(0.43,16,12),metal,0,0.95,0.02,0.9,1.05,0.85);
-    add(new THREE.BoxGeometry(0.48,0.18,0.08),red,0,0.98,0.42);
-    add(new THREE.BoxGeometry(0.42,0.72,0.42),dark,0,-0.88,0);
-    for (const side of [-1,1]) {
-      add(new THREE.BoxGeometry(0.42,0.82,0.42),metal,side*0.88,0.05,0);
-      add(new THREE.BoxGeometry(0.28,0.7,0.3),dark,side*0.88,-0.62,0);
-      add(new THREE.BoxGeometry(0.38,0.95,0.38),metal,side*0.38,-1.42,0);
-      add(new THREE.BoxGeometry(0.22,0.5,0.24),dark,side*0.38,-2.1,0.08);
-      add(new THREE.BoxGeometry(0.18,0.7,0.18),metal,side*0.92,0.82,-0.02);
-    }
-    const core = add(new THREE.SphereGeometry(0.22,16,12),red,0,0.05,0.31);
-    core.scale.set(1,1,0.35);
-    g.scale.setScalar(1.35);
-    g.visible = false;
+    this.urig = buildUltron();
+    this.ultron = this.urig.root;
+    this.ultron.scale.setScalar(1.35);
+    this.ultron.visible = false;
   }
 
   private updateUltron(dt: number) {
     if (!this.ultronActive || !this.bossAuthority || this.boss.state === "dead") return;
+    const u = this.urig;
     const target = this.getBossTarget().position;
-    const desired = new THREE.Vector3(this.boss.pos.x + 4.5, 5.4 + Math.sin(this.time * 2.4) * 0.35, this.boss.pos.z - 2.5);
+    const desired = new THREE.Vector3(this.boss.pos.x + 4.5 + Math.sin(this.time * 0.7) * 3.2, 5.6 + Math.sin(this.time * 2.4) * 0.45, this.boss.pos.z - 2.5 + Math.cos(this.time * 0.6) * 3);
     this.ultron.position.lerp(desired, 1 - Math.exp(-2.8 * dt));
     this.ultron.lookAt(target.x, target.y + 1.2, target.z);
-    this.ultron.rotation.x = Math.sin(this.time * 1.7) * 0.06;
+    this.ultron.rotation.x += Math.sin(this.time * 1.7) * 0.06;
+    // idle animation: halo rings, core pulse, jet flame, fins breathing
+    u.rings[0].rotation.z += dt * 1.6;
+    u.rings[1].rotation.z -= dt * 1.1;
+    u.rings[1].rotation.y += dt * 0.7;
+    (u.core.material as THREE.MeshStandardMaterial).emissiveIntensity = 4 + Math.sin(this.time * 6) * 1.6 + (this.ultronFire < 0.7 ? 5 : 0);
+    u.flame.scale.set(0.9 + Math.random() * 0.25, 0.85 + Math.random() * 0.45, 0.9 + Math.random() * 0.25);
+    u.fins.forEach((f, i) => {
+      const side = i < 3 ? -1 : 1;
+      f.rotation.z = -side * (0.5 + (i % 3) * 0.45 + Math.sin(this.time * 1.4 + i) * 0.06 + (this.ultronFire < 0.7 ? 0.25 : 0));
+    });
+    for (const e of u.eyes) (e.material as THREE.MeshStandardMaterial).emissiveIntensity = 5 + Math.sin(this.time * 9) * 1.5;
+    if (Math.random() < dt * 26) {
+      const fp = this.ultron.localToWorld(this.tA.set(0, -2.3, 0));
+      this.fx.spawn(fp.x, fp.y, fp.z, rnd(-0.6, 0.6), rnd(-4, -2), rnd(-0.6, 0.6), 0.5, 0.22, new THREE.Color(2.2, 0.45, 0.3));
+    }
     this.ultronFire -= dt;
     if (this.ultronFire <= 0) {
       this.ultronFire = 3.8;
       const from = this.ultron.position.clone().add(new THREE.Vector3(0, 0.2, 0));
       const aim = new THREE.Vector3(target.x, target.y + 1.0, target.z).sub(from).normalize();
       this.spawnOrb(from, aim, 24, 13);
-      for (let i = 0; i < 5; i++) this.fx.spawn(from.x, from.y, from.z, rnd(-2,2), rnd(-1,2), rnd(-2,2), 0.3, 0.12, new THREE.Color(1.8,0.25,0.35));
+      for (let i = 0; i < 8; i++) this.fx.spawn(from.x, from.y, from.z, rnd(-2, 2), rnd(-1, 2), rnd(-2, 2), 0.3, 0.12, new THREE.Color(1.8, 0.25, 0.35));
       sfx.shoot();
     }
   }
@@ -787,6 +824,19 @@ private nano: NanoSystem;
         this.selectSkill(this.combatMode === 0 ? 0 : 6);
       }
       if (e.code === "KeyB" && !this.armorDestroyed) this.toggleWings();
+      if (e.code === "KeyF" && !this.armorDestroyed) this.toggleFlight();
+      if (e.code === "KeyX" && !this.armorDestroyed) this.meteorDive();
+      if (e.code === "Space" && !this.armorDestroyed) {
+        if (this.time - this.pl.lastSpace < 0.28 && !this.pl.flying) this.toggleFlight(true);
+        this.pl.lastSpace = this.time;
+      }
+      if (e.code === "KeyA" || e.code === "KeyD") {
+        const left = e.code === "KeyA";
+        const last = left ? this.pl.lastA : this.pl.lastD;
+        if (this.pl.flying && this.time - last < 0.26) this.barrelRoll(left ? -1 : 1);
+        if (left) this.pl.lastA = this.time;
+        else this.pl.lastD = this.time;
+      }
       if ((e.code === "ShiftLeft" || e.code === "ShiftRight") && !this.armorDestroyed) this.dash();
       if (e.code === "KeyQ" && !this.armorDestroyed) this.selectWeapon((this.nano.pending + WEAPON_COUNT - 1) % WEAPON_COUNT);
       if (e.code === "KeyE" && !this.armorDestroyed) this.selectWeapon((this.nano.pending + 1) % WEAPON_COUNT);
@@ -950,6 +1000,32 @@ private nano: NanoSystem;
     }
   }
 
+  getBossSkin() {
+    return this.bossSkin;
+  }
+
+  /** swap Thanos' model/skin (menu & result screens only) */
+  setBossSkin(skin: ThanosSkin) {
+    if (skin === this.bossSkin) return;
+    if (this.status === "playing" || this.status === "paused") return;
+    this.bossSkin = skin;
+    const old = this.brig;
+    this.scene.remove(old.root);
+    old.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      }
+    });
+    this.brig = buildThanos(skin);
+    this.brig.root.scale.setScalar(THANOS_SCALE);
+    this.brig.root.position.copy(this.boss.pos);
+    this.brig.root.rotation.set(0, this.boss.yaw, 0);
+    this.scene.add(this.brig.root);
+    this.emitHud(true);
+  }
+
   toggleSuit() {
   if (this.armorDestroyed) return false;
   return this.suit.toggle();
@@ -1085,7 +1161,12 @@ touchLook(dx: number, dy: number) {
     Object.assign(p, {
       absorbing: false, refocus: 0, heat: 0, overheat: false, uniOn: false, uniTick: 0, ult: 0, channel: 0,
       katarT: 0, katarCombo: 0, hammerT: 0, ram: false, wing: 0.35, snd: 0,
+      flying: false, flyT: 0, afterburner: false, rollT: 0, rollCd: 0, diveT: 0, diveCd: 0,
     });
+    this.fl.pitch = this.fl.bank = 0;
+    this.camRoll = 0;
+    this.camDist = 8.5;
+    this.bossWind = 0;
     this.hint = "";
     this.hintT = 0;
     this.armPose = { shR: -0.5, elR: -0.9, shL: 0, elL: -0.3, zR: 0, zL: 0 };
@@ -1218,6 +1299,14 @@ touchLook(dx: number, dy: number) {
       mark50Available: this.armorDestroyed && !this.mark50Used,
       mark50Cinematic: this.mark50Cinematic,
       armorModel: this.armorModel,
+      flying: this.pl.flying,
+      fspeed: Math.round(this.pl.vel.length() * 3.6),
+      alt: Math.max(0, Math.round(this.pl.pos.y * 3)),
+      afterburner: this.pl.afterburner,
+      diveCd: this.pl.diveCd,
+      rollCd: this.pl.rollCd,
+      diving: this.pl.diveT > 0,
+      bossSkin: this.bossSkin,
     });
   }
 
@@ -1263,6 +1352,124 @@ touchLook(dx: number, dy: number) {
     p.dashCd = 1.1;
     sfx.dash();
     if (ram) this.say("BATTERING RAM!", 1);
+  }
+
+  toggleFlight(on?: boolean) {
+    const p = this.pl;
+    if (this.status !== "playing" && on !== false) return;
+    if (this.armorDestroyed && on !== false) return;
+    const want = on ?? !p.flying;
+    if (want === p.flying) return;
+    if (want) {
+      if (this.suit.active) return;
+      if (p.boostEmpty || p.boost < 12) {
+        this.say("พลังงานขับดันไม่พอสำหรับบิน", 1.2);
+        sfx.block();
+        return;
+      }
+      p.flying = true;
+      p.flyT = 0.45;
+      if (p.vel.y < 6) p.vel.y = 6;
+      if (p.pos.y < 0.06) p.pos.y = 0.06;
+      sfx.whoosh();
+      this.spawnRing(p.pos.x, Math.max(0.15, p.pos.y), p.pos.z, new THREE.Color(0.8, 1.8, 2.8), 16, 6);
+      this.say("โหมดบิน · WASD บินตามกล้อง · SPACE/C ขึ้น-ลง · SHIFT ค้าง = Afterburner · X = Meteor Dive · แตะ A/D สองครั้ง = Barrel Roll", 3.4);
+    } else {
+      p.flying = false;
+      p.afterburner = false;
+      p.rollT = 0;
+      p.diveT = 0;
+      if (this.status === "playing") this.say("ปิดโหมดบิน", 0.9);
+    }
+    this.emitHud(true);
+  }
+
+  private afterburnKick() {
+    const p = this.pl;
+    sfx.whoosh();
+    this.shake = Math.max(this.shake, 0.22);
+    this.spawnRing(p.pos.x, p.pos.y + 1, p.pos.z, new THREE.Color(1.4, 2.0, 3.0), 26, 10);
+    const c = new THREE.Color(1.2, 2.0, 3.0);
+    for (let i = 0; i < 18; i++) this.fx.spawn(p.pos.x, p.pos.y + 1.1, p.pos.z, rnd(-6, 6), rnd(-6, 6), rnd(-6, 6), 0.4, 0.2, c);
+  }
+
+  private barrelRoll(dir: number) {
+    const p = this.pl;
+    if (!p.flying || p.rollCd > 0 || p.rollT > 0 || p.diveT > 0 || this.status !== "playing" || this.armorDestroyed) return;
+    p.rollT = 0.5;
+    p.rollDir = dir;
+    p.rollCd = 1.5;
+    p.invul = Math.max(p.invul, 0.5);
+    const right = this.pr.set(-Math.cos(this.camYaw), 0, Math.sin(this.camYaw));
+    p.vel.addScaledVector(right, dir * 26);
+    sfx.dash();
+    const c = new THREE.Color(1.0, 1.9, 2.8);
+    for (let i = 0; i < 20; i++) this.fx.spawn(p.pos.x, p.pos.y + 1.1, p.pos.z, rnd(-5, 5), rnd(-3, 5), rnd(-5, 5), 0.45, 0.16, c);
+    this.say("BARREL ROLL!", 0.7);
+  }
+
+  private meteorDive() {
+    const p = this.pl;
+    if (this.status !== "playing" || this.armorDestroyed || this.suit.active) return;
+    if (!p.flying) {
+      this.say("Meteor Dive ต้องอยู่ในโหมดบิน (กด F)", 1.4);
+      return;
+    }
+    if (p.diveCd > 0) {
+      this.say(`Meteor Dive กำลังคูลดาวน์ ${Math.ceil(p.diveCd)} วิ`, 1);
+      return;
+    }
+    if (p.pos.y < 5 || p.diveT > 0) {
+      if (p.diveT <= 0) this.say("ต้องบินสูงกว่านี้เพื่อ Meteor Dive", 1.2);
+      return;
+    }
+    const b = this.boss;
+    const dir = p.diveDir;
+    const cp = Math.cos(1.0);
+    dir.set(Math.sin(this.camYaw) * cp, -Math.sin(1.0), Math.cos(this.camYaw) * cp);
+    if (b.state !== "dead") {
+      const to = this.v1.set(b.pos.x - p.pos.x, b.pos.y + 3 - (p.pos.y + 1), b.pos.z - p.pos.z);
+      const flat = Math.hypot(to.x, to.z) || 1;
+      const facing = (to.x * Math.sin(this.camYaw) + to.z * Math.cos(this.camYaw)) / flat;
+      if (facing > 0.35 && to.y < -2) dir.copy(to).normalize();
+    }
+    p.diveT = 2;
+    p.diveCd = 9;
+    p.diveStartY = p.pos.y;
+    p.afterburner = false;
+    p.dashT = 0;
+    sfx.charge();
+    this.shake = Math.max(this.shake, 0.3);
+    this.say("METEOR DIVE!", 0.9);
+  }
+
+  private diveImpact(midAir: boolean) {
+    const p = this.pl;
+    const b = this.boss;
+    const height = clamp(p.diveStartY, 0, 45);
+    p.diveT = 0;
+    const at = this.v2.set(p.pos.x, Math.max(0.2, p.pos.y), p.pos.z);
+    const hot = new THREE.Color(2.6, 1.5, 0.5);
+    this.explode(at, 1.3, hot);
+    this.spawnRing(at.x, 0.2, at.z, new THREE.Color(2.4, 1.6, 0.6), 30, 14);
+    this.spawnRing(at.x, 0.3, at.z, new THREE.Color(1.2, 1.8, 3.0), 20, 10);
+    for (let i = 0; i < 40; i++) this.fx.spawn(at.x, 0.3, at.z, rnd(-10, 10), rnd(2, 12), rnd(-10, 10), rnd(0.5, 1.1), rnd(0.2, 0.5), new THREE.Color(0.8, 0.6, 0.9), -9);
+    this.shake = 1;
+    sfx.boom();
+    if (b.state !== "dead" && b.state !== "roar") {
+      const d = Math.hypot(b.pos.x - at.x, b.pos.z - at.z);
+      if (midAir || d < 12) {
+        const dmg = (130 + height * 3.4) * (midAir ? 1.25 : 1);
+        this.damageBoss(dmg, this.v3.set(b.pos.x, b.pos.y + 3, b.pos.z));
+        this.staggerBoss(1.6);
+        this.say(`METEOR DIVE ฮิต! −${Math.round(dmg)}`, 1.5);
+      } else {
+        this.say("Meteor Dive พลาดเป้า — เข้าใกล้บอสมากกว่านี้", 1.4);
+      }
+    }
+    p.vel.set(0, midAir ? 10 : 13, 0);
+    p.pos.y = Math.max(p.pos.y, 0.3);
+    p.invul = Math.max(p.invul, 0.4);
   }
 
   private heal() {
@@ -1443,7 +1650,13 @@ touchLook(dx: number, dy: number) {
     }
 
     // ---- movement
-    let speed = grounded ? 11 : 14;
+    const space = k.has("Space");
+    p.rollCd = Math.max(0, p.rollCd - dt);
+    p.diveCd = Math.max(0, p.diveCd - dt);
+    p.flyT = Math.max(0, p.flyT - dt);
+    if (p.rollT > 0) p.rollT = Math.max(0, p.rollT - dt);
+    if (p.flying && (this.armorDestroyed || this.suit.active)) this.toggleFlight(false);
+    let speed = grounded && !p.flying ? 11 : 14;
     if (blocking) speed = 5;
     if (p.charge > 0) speed = 6;
     if (p.swingT > 0) speed = 7;
@@ -1453,48 +1666,111 @@ touchLook(dx: number, dy: number) {
     if (p.hammerT > 0) speed = 4;
     if (p.katarT > 0) speed = 8;
 
+    const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
+    const ab = p.flying && shiftHeld && p.boost > 6 && p.dashT <= 0 && p.diveT <= 0 && !p.boostEmpty && speed >= 13.9;
+    if (ab && !p.afterburner) this.afterburnKick();
+    p.afterburner = ab;
+
     if (p.dashT > 0) {
       p.dashT -= dt;
       p.vel.x = p.dashDir.x * (p.ram ? 44 : 36);
       p.vel.z = p.dashDir.z * (p.ram ? 44 : 36);
+      if (p.flying) p.vel.y *= Math.exp(-6 * dt);
       if (p.dashT <= 0) p.ram = false;
       this.fx.spawn(p.pos.x, p.pos.y + 1, p.pos.z, 0, 0, 0, 0.35, 0.5, new THREE.Color(0.7, 1.5, 2.2));
+    } else if (p.diveT > 0) {
+      // METEOR DIVE – committed, invulnerable plunge
+      p.diveT -= dt;
+      p.vel.copy(p.diveDir).multiplyScalar(68);
+      p.invul = Math.max(p.invul, 0.12);
+      for (let i = 0; i < 3; i++) {
+        this.fx.spawn(p.pos.x + rnd(-0.4, 0.4), p.pos.y + 1 + rnd(-0.5, 0.8), p.pos.z + rnd(-0.4, 0.4), rnd(-2, 2) - p.vel.x * 0.12, rnd(-2, 2) - p.vel.y * 0.12, rnd(-2, 2) - p.vel.z * 0.12, 0.5, rnd(0.25, 0.5), new THREE.Color(rnd(1.6, 2.6), rnd(0.8, 1.4), 0.3));
+      }
+      if (p.diveT <= 0) {
+        p.diveT = 0;
+        p.vel.multiplyScalar(0.25);
+      }
     } else if (p.lungeT > 0) {
       p.lungeT -= dt;
       p.vel.x = Math.sin(p.heading) * 19;
       p.vel.z = Math.cos(p.heading) * 19;
+    } else if (p.flying) {
+      // FREE FLIGHT – fly where the camera looks (level at the default camera angle)
+      const fp = clamp(-(this.camPitch - 0.18) * 1.1, -1.2, 0.85);
+      const cpF = Math.cos(fp);
+      const fdir = this.fv.set(Math.sin(this.camYaw) * cpF, Math.sin(fp), Math.cos(this.camYaw) * cpF);
+      const tgt = this.ft.set(0, 0, 0).addScaledVector(fdir, iz).addScaledVector(right, ix);
+      const climb = (space ? 1 : 0) - (k.has("KeyC") ? 1 : 0);
+      tgt.y += climb;
+      const hasInput = tgt.lengthSq() > 0.0001;
+      if (tgt.lengthSq() > 1) tgt.normalize();
+      const top = (p.afterburner ? 48 : 26) * clamp(speed / 14, 0.3, 1);
+      tgt.multiplyScalar(top);
+      if (!hasInput) tgt.set(0, Math.sin(this.time * 2.2) * 0.6, 0);
+      const acc = 1 - Math.exp(-(hasInput ? (p.afterburner ? 2.6 : 3.4) : 2.6) * dt);
+      p.vel.x += (tgt.x - p.vel.x) * acc;
+      p.vel.y += (tgt.y - p.vel.y) * acc;
+      p.vel.z += (tgt.z - p.vel.z) * acc;
     } else {
       const a = 1 - Math.exp(-(grounded ? 14 : 5) * dt);
       p.vel.x += (wish.x * speed - p.vel.x) * a;
       p.vel.z += (wish.z * speed - p.vel.z) * a;
     }
 
-    // vertical: jump / hover with thrusters
-    const space = k.has("Space");
-    if (space && !p.spaceHeld && grounded) p.vel.y = 9;
-    p.spaceHeld = space;
-    if (p.boostEmpty && p.boost > 20) p.boostEmpty = false;
-    const thrust = !this.armorDestroyed && space && p.boost > 0 && !p.boostEmpty;
-    p.thrusting = thrust;
-    if (thrust) {
-      p.vel.y = Math.min(p.vel.y + 55 * dt, 10.5);
-      p.boost -= 30 * dt;
+    // vertical: jump / hover with thrusters (walking mode) – flight handled above
+    if (p.flying) {
+      p.thrusting = true;
+      p.spaceHeld = space;
       p.boostDelay = 0.7;
+      const moving = p.vel.lengthSq() > 16;
+      p.boost -= (p.afterburner ? 20 : p.diveT > 0 ? 0 : moving ? 6 : 3.5) * dt;
       if (p.boost <= 0) {
         p.boost = 0;
         p.boostEmpty = true;
+        this.say("พลังงานขับดันหมด — ระบบบินดับ", 1.6);
+        sfx.block();
+        this.toggleFlight(false);
       }
-      if (Math.random() < 0.7) this.fx.spawn(p.pos.x + rnd(-0.3, 0.3), p.pos.y + 0.1, p.pos.z + rnd(-0.3, 0.3), rnd(-1, 1), rnd(-6, -3), rnd(-1, 1), 0.3, 0.2, new THREE.Color(2.0, 1.3, 0.4));
     } else {
-      p.vel.y -= 30 * dt;
-      if (p.vel.y < -20) p.vel.y = -20;
-      if (grounded) p.boost = Math.min(100, p.boost + 32 * dt);
-      else if (p.boostDelay <= 0) p.boost = Math.min(100, p.boost + 7 * dt);
+      if (space && !p.spaceHeld && grounded) p.vel.y = 9;
+      p.spaceHeld = space;
+      if (p.boostEmpty && p.boost > 20) p.boostEmpty = false;
+      const thrust = !this.armorDestroyed && space && p.boost > 0 && !p.boostEmpty;
+      p.thrusting = thrust;
+      if (thrust) {
+        p.vel.y = Math.min(p.vel.y + 55 * dt, 10.5);
+        p.boost -= 30 * dt;
+        p.boostDelay = 0.7;
+        if (p.boost <= 0) {
+          p.boost = 0;
+          p.boostEmpty = true;
+        }
+        if (Math.random() < 0.7) this.fx.spawn(p.pos.x + rnd(-0.3, 0.3), p.pos.y + 0.1, p.pos.z + rnd(-0.3, 0.3), rnd(-1, 1), rnd(-6, -3), rnd(-1, 1), 0.3, 0.2, new THREE.Color(2.0, 1.3, 0.4));
+      } else {
+        p.vel.y -= 30 * dt;
+        if (p.vel.y < -20) p.vel.y = -20;
+        if (grounded) p.boost = Math.min(100, p.boost + 32 * dt);
+        else if (p.boostDelay <= 0) p.boost = Math.min(100, p.boost + 7 * dt);
+      }
     }
-    if (p.pos.y > 30 && p.vel.y > 0) p.vel.y = 0;
+    if (p.pos.y > (p.flying ? 70 : 30) && p.vel.y > 0) p.vel.y = 0;
 
     const prevVy = p.vel.y;
     p.pos.addScaledVector(p.vel, dt);
+    if (p.pos.y < 0 && p.diveT <= 0) {
+      if (p.flying && p.flyT <= 0 && !space) {
+        // touched down – leave flight mode
+        this.toggleFlight(false);
+        if (prevVy < -22) {
+          this.spawnRing(p.pos.x, 0.15, p.pos.z, new THREE.Color(1.2, 1.6, 2.4), 22, 9);
+          this.shake = Math.max(this.shake, 0.35);
+        }
+      }
+    }
+    if (p.diveT > 0) {
+      const chestD = this.v3.set(p.pos.x, p.pos.y + 1.2, p.pos.z);
+      if (p.pos.y <= 0.15 || (this.boss.state !== "dead" && this.bossDist(chestD) < 4.4)) this.diveImpact(p.pos.y > 0.4);
+    }
     if (p.pos.y < 0) {
       if (prevVy < -14) {
         const c = new THREE.Color(0.8, 0.6, 0.9);
@@ -2075,24 +2351,51 @@ private updatePlayerPose(dt: number) {
     const speed = Math.hypot(p.vel.x, p.vel.z);
     const dead = this.status === "lost";
     if (this.suit.active) {
+      if (this.tilted) {
+        r.root.rotation.set(0, p.heading, 0);
+        this.tilted = false;
+        this.fl.pitch = this.fl.bank = 0;
+      }
       this.suit.poseTony(dt, this.time, { pos: p.pos, heading: p.heading, speed, walk: p.walk, grounded, camPitch: this.camPitch });
       return;
     }
 
-    r.root.position.copy(p.pos);
-    r.root.rotation.y = p.heading;
+    // ---- flight attitude: pitch + bank + barrel roll, all pivoting around the hips
+    const fly = p.flying && !dead;
+    const sinH = Math.sin(p.heading);
+    const cosH = Math.cos(p.heading);
+    const vf = p.vel.x * sinH + p.vel.z * cosH;
+    const vl = -p.vel.x * cosH + p.vel.z * sinH;
+    let pitchT = 0;
+    let bankT = 0;
+    if (fly) {
+      if (p.diveT > 0) pitchT = 1.45;
+      else pitchT = clamp(vf / 28, -0.35, 1) * 1.3 + clamp(-p.vel.y / 40, 0, 0.7) * 0.6 - clamp(p.vel.y / 50, 0, 0.4) * 0.3;
+      bankT = clamp(vl / 26, -1, 1) * 0.75;
+    }
+    this.fl.pitch = damp(this.fl.pitch, pitchT, p.diveT > 0 ? 14 : 6, dt);
+    this.fl.bank = damp(this.fl.bank, bankT, 6, dt);
+    const rollAng = p.rollT > 0 ? p.rollDir * (1 - p.rollT / 0.5) * TAU : 0;
+    const qq = this.qA.setFromAxisAngle(this.yAxis, p.heading);
+    qq.multiply(this.qB.setFromAxisAngle(this.axX, this.fl.pitch));
+    qq.multiply(this.qB.setFromAxisAngle(this.axB.set(0, Math.sin(this.fl.pitch), Math.cos(this.fl.pitch)), this.fl.bank + rollAng));
+    r.root.quaternion.copy(qq);
+    this.tA.copy(this.hipC).applyQuaternion(qq);
+    r.root.position.copy(p.pos).add(this.hipC).sub(this.tA);
+    this.tilted = true;
 
     // legs
     const sw = grounded ? Math.sin(p.walk) * Math.min(1, speed / 8) * 0.85 : 0;
     const air = !grounded;
-    r.hipR.rotation.x = damp(r.hipR.rotation.x, air ? 0.15 : sw, 18, dt);
-    r.hipL.rotation.x = damp(r.hipL.rotation.x, air ? -0.25 : -sw, 18, dt);
-    r.kneeR.rotation.x = damp(r.kneeR.rotation.x, air ? 0.35 : Math.max(0, -sw) * 0.9, 18, dt);
-    r.kneeL.rotation.x = damp(r.kneeL.rotation.x, air ? 0.5 : Math.max(0, sw) * 0.9, 18, dt);
+    const flut = Math.sin(this.time * 3.2) * 0.04;
+    r.hipR.rotation.x = damp(r.hipR.rotation.x, fly ? 0.06 + flut : air ? 0.15 : sw, 18, dt);
+    r.hipL.rotation.x = damp(r.hipL.rotation.x, fly ? -0.1 - flut : air ? -0.25 : -sw, 18, dt);
+    r.kneeR.rotation.x = damp(r.kneeR.rotation.x, fly ? 0.22 : air ? 0.35 : Math.max(0, -sw) * 0.9, 18, dt);
+    r.kneeL.rotation.x = damp(r.kneeL.rotation.x, fly ? 0.34 : air ? 0.5 : Math.max(0, sw) * 0.9, 18, dt);
 
     // lean
     const W_ = this.nano.current;
-    let lean = air ? 0.15 + Math.min(0.35, speed / 30) : Math.min(0.28, speed / 40);
+    let lean = fly ? 0.05 : air ? 0.15 + Math.min(0.35, speed / 30) : Math.min(0.28, speed / 40);
     if (p.uniOn) lean = -0.14;
     if (p.absorbing) lean = -0.08;
     if (W_ === W.HAMMER && p.hammerT > 0) {
@@ -2101,15 +2404,32 @@ private updatePlayerPose(dt: number) {
     }
     r.body.rotation.x = damp(r.body.rotation.x, dead ? 1.2 : lean, 8, dt);
     r.body.rotation.y = damp(r.body.rotation.y, p.swingT > 0 ? Math.sin((0.45 - p.swingT) * 7) * 0.3 : p.katarT > 0 ? (p.katarHand ? 0.4 : -0.4) : 0, 14, dt);
-    r.head.rotation.x = damp(r.head.rotation.x, -lean * 0.8 + (this.camPitch - 0.2) * 0.4, 8, dt);
+    r.head.rotation.x = damp(r.head.rotation.x, -lean * 0.8 + (this.camPitch - 0.2) * 0.4 - (fly ? this.fl.pitch * 0.62 : 0), 8, dt);
 
-    // flames
+    // flames (leg jets + palm jets) and contrails
     const fl = (p.thrusting || p.pos.y > 0.3) && !dead;
+    const spd3 = p.vel.length();
+    const fi = p.flying ? 0.8 + clamp(spd3 / 40, 0, 0.6) + (p.afterburner ? 0.9 : 0) + (p.diveT > 0 ? 0.5 : 0) : p.thrusting ? 1 : 0.45;
+    const palmFree = fly && this.nano.ready && p.aimT <= 0 && !p.absorbing && !p.uniOn && !p.blocking && p.swingT <= 0 && p.katarT <= 0 && p.hammerT <= 0 && p.charge <= 0 && p.channel <= 0;
     for (const f of r.flames) {
-      f.visible = fl;
-      if (fl) {
-        const s = p.thrusting ? 1 : 0.45;
-        f.scale.set(0.8 + Math.random() * 0.4, s * (0.8 + Math.random() * 0.5), 0.8 + Math.random() * 0.4);
+      const hand = r.handFlames.includes(f);
+      const on = hand ? palmFree && p.diveT <= 0 : fl;
+      f.visible = on;
+      if (on) {
+        const k = f.userData.inner ? 0.85 : 1;
+        const len = hand ? 0.45 + fi * 0.5 : fi;
+        f.scale.set(0.8 + Math.random() * 0.4, len * k * (0.8 + Math.random() * 0.5), 0.8 + Math.random() * 0.4);
+      }
+    }
+    if (fly && spd3 > 5) {
+      if (this.footFlames.length === 0) this.footFlames = r.flames.filter((f) => !r.handFlames.includes(f) && !f.userData.inner);
+      r.root.updateMatrixWorld(true);
+      const col = p.afterburner || p.diveT > 0 ? new THREE.Color(0.9, 1.8, 3.0) : new THREE.Color(2.2, 1.2, 0.4);
+      const rate = p.afterburner ? 1 : spd3 > 20 ? 0.8 : 0.4;
+      for (const f of this.footFlames) {
+        if (Math.random() > rate) continue;
+        f.getWorldPosition(this.tA);
+        this.fx.spawn(this.tA.x, this.tA.y, this.tA.z, -p.vel.x * 0.12 + rnd(-0.6, 0.6), -p.vel.y * 0.12 + rnd(-0.8, 0.2), -p.vel.z * 0.12 + rnd(-0.6, 0.6), rnd(0.35, 0.65), p.afterburner ? 0.32 : 0.2, col);
       }
     }
     // chest pulse (triangular arc reactor)
@@ -2286,6 +2606,15 @@ private updatePlayerPose(dt: number) {
         kL = 12;
       }
     }
+    if (palmFree) {
+      // cruise pose: arms swept back, palms firing; hover pose: arms relaxed outward
+      const cruise = clamp(spd3 / 18, 0, 1);
+      tShR = tShL = 0.1 + cruise * 0.55;
+      tElR = tElL = -0.12;
+      tZR = -(0.3 + (1 - cruise) * 0.35);
+      tZL = 0.3 + (1 - cruise) * 0.35;
+      kR = kL = 8;
+    }
     if (dead) {
       tShR = 0.3;
       tElR = -0.2;
@@ -2376,6 +2705,7 @@ private updatePlayerPose(dt: number) {
     else if (this.suit.active) target = 0.5;
     else if (this.nano.current === W.REFOCUS && this.nano.ready) target = p.absorbing ? 1 : 0.8;
     else if (this.nano.current === W.UNI && this.nano.ready && p.heat > 0) target = 1;
+    else if (p.flying) target = p.afterburner || p.diveT > 0 ? 1 : 0.78;
     else if (p.thrusting || p.pos.y > 0.5) target = 0.6;
     p.wing = damp(p.wing, target, 6, dt);
     const d = p.wing;
@@ -2543,7 +2873,9 @@ private updatePlayerPose(dt: number) {
       cam.updateProjectionMatrix();
       return;
     }
-    const dist = 8.5;
+    const flySpd = p.flying ? p.vel.length() : 0;
+    this.camDist = damp(this.camDist, 8.5 + clamp(flySpd / 45, 0, 1) * 2.6 + (p.diveT > 0 ? 1.5 : 0), 3, dt);
+    const dist = this.camDist;
     const cp = Math.cos(this.camPitch);
     const dir = this.v1.set(Math.sin(this.camYaw) * cp, -Math.sin(this.camPitch), Math.cos(this.camYaw) * cp);
     const right = this.v2.set(-Math.cos(this.camYaw), 0, Math.sin(this.camYaw));
@@ -2557,8 +2889,10 @@ private updatePlayerPose(dt: number) {
       cam.position.z += rnd(-1, 1) * this.shake * 0.45;
     }
     cam.lookAt(this.pw.copy(cam.position).addScaledVector(dir, 30));
-    const tf = p.dashT > 0 ? 82 : 70;
-    this.fov = damp(this.fov, tf, 10, dt);
+    this.camRoll = damp(this.camRoll, p.flying ? -this.fl.bank * 0.2 : 0, 4, dt);
+    if (Math.abs(this.camRoll) > 0.001) cam.rotateZ(this.camRoll);
+    const tf = p.dashT > 0 ? 82 : 70 + (p.flying ? clamp(flySpd / 46, 0, 1) * (p.afterburner ? 24 : 12) : 0) + (p.diveT > 0 ? 14 : 0);
+    this.fov = damp(this.fov, tf, p.flying ? 5 : 10, dt);
     cam.fov = this.fov;
     cam.updateProjectionMatrix();
   }
@@ -3417,6 +3751,33 @@ private updatePlayerPose(dt: number) {
     // infinity stones pulse
     const pulse = (b.phase === 2 ? 5 : 3) + Math.sin(this.time * (b.phase === 2 ? 8 : 4)) * 1.2;
     for (const s of r.stones) (s.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
+    r.halos.forEach((h, i) => h.scale.setScalar(1 + Math.sin(this.time * 5 + i * 1.1) * 0.18 + (b.phase === 2 ? 0.45 : 0)));
+
+    // cloth sway, glowing eyes / veins and the skin's aura
+    const windT = b.state === "rush" ? 0.6 : b.state === "slam" ? 0.35 : b.state === "idle" ? 0.12 : 0.06;
+    this.bossWind = damp(this.bossWind, windT + (b.phase === 2 ? 0.06 : 0), 3, dt);
+    for (const seg of r.cloth) {
+      seg.pivot.rotation.x = seg.base + Math.sin(this.time * 1.9 + seg.phase) * seg.amp * (1 + this.bossWind * 2) + this.bossWind * 0.35;
+    }
+    const rage = b.phase === 2;
+    for (const e of r.eyes) {
+      const m = e.material as THREE.MeshStandardMaterial;
+      m.emissive.setHex(rage ? 0xff2418 : (e.userData.base as number) ?? 0xffd24a);
+      m.emissiveIntensity = (r.skin === "void" ? 4 : 1.6) + (rage ? 2.5 + Math.sin(this.time * 9) * 0.8 : 0);
+    }
+    r.veins.forEach((v, i) => {
+      (v.material as THREE.MeshStandardMaterial).emissiveIntensity = 2.4 + Math.sin(this.time * 3 + i) * 0.9 + (rage ? 2.2 : 0);
+    });
+    if (b.state !== "dead") {
+      const strength = r.skin === "void" ? 1 : rage ? 0.8 : 0.14;
+      if (Math.random() < dt * 40 * strength) {
+        const info = THANOS_SKINS.find((k) => k.id === r.skin);
+        const a = rnd(0, TAU);
+        const rr = rnd(1.2, 3.2);
+        const col = new THREE.Color(info?.aura ?? 0xb070ff).multiplyScalar(2.2);
+        this.fx.spawn(b.pos.x + Math.cos(a) * rr, b.pos.y + rnd(0.3, 6.5), b.pos.z + Math.sin(a) * rr, rnd(-0.3, 0.3), rnd(1.5, 3.6), rnd(-0.3, 0.3), rnd(0.8, 1.5), rnd(0.12, 0.26), col);
+      }
+    }
 
     setFlash(r.mats, b.flash * 0.55, 1, 0.9, 1);
     if (b.phase === 2) {

@@ -8,9 +8,8 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// GitHub Pages serves this project from /boss-battle-yee/.
+// https://vite.dev/config/
 export default defineConfig({
-  base: "/boss-battle-yee/",
   plugins: [react(), tailwindcss(), viteSingleFile()],
   resolve: {
     alias: {

@@ -174,6 +174,8 @@ export interface IronRig {
   hipL: THREE.Group;
   kneeL: THREE.Group;
   flames: THREE.Mesh[];
+  handFlames: THREE.Mesh[];
+  backThrusters: THREE.Mesh[];
   mats: FlashMat[];
   /* nano weapon mount points */
   mountC: THREE.Group; // chest (arc reactor) – uni-beam
@@ -350,6 +352,34 @@ export function buildIronMan(): IronRig {
   boxR(head, 0.09, 0.03, 0.025, EYE, -0.07, 0.045, 0.192, { rz: 0.2 }, { emissive: 0x7fe6ff, ei: 5, metal: 0 });
   box(head, 0.1, 0.014, 0.025, GUN, 0, -0.1, 0.192, S); // mouth slit
 
+  const flames: THREE.Mesh[] = [];
+  const handFlames: THREE.Mesh[] = [];
+  const mkFlameGeo = (r: number, len: number) => {
+    const g = new THREE.ConeGeometry(r, len, 10, 1, true);
+    g.rotateX(Math.PI);
+    g.translate(0, -len / 2, 0);
+    return g;
+  };
+  const flameOuterGeo = mkFlameGeo(0.14, 0.95);
+  const flameInnerGeo = mkFlameGeo(0.07, 0.62);
+  const palmOuterGeo = mkFlameGeo(0.09, 0.6);
+  const palmInnerGeo = mkFlameGeo(0.045, 0.38);
+  const flameMat = (r: number, g: number, b: number, op: number) =>
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const addFlame = (parent: THREE.Object3D, x: number, y: number, z: number, hand: boolean) => {
+    const o = new THREE.Mesh(hand ? palmOuterGeo : flameOuterGeo, flameMat(2.4, 1.1, 0.3, 0.75));
+    const n = new THREE.Mesh(hand ? palmInnerGeo : flameInnerGeo, flameMat(1.6, 2.4, 3.0, 0.95));
+    n.userData.inner = true;
+    for (const m of [o, n]) {
+      m.position.set(x, y, z);
+      m.visible = false;
+      m.frustumCulled = false;
+      parent.add(m);
+      flames.push(m);
+      if (hand) handFlames.push(m);
+    }
+  };
+
   /* ---------------- arms ---------------- */
   const makeArm = (side: number) => {
     const sh = pivot(body, side * 0.54, 0.74, 0);
@@ -377,11 +407,21 @@ export function buildIronMan(): IronRig {
   };
   const aR = makeArm(-1); // character's right = screen right when seen from behind
   const aL = makeArm(1);
+  // palm repulsor-thrusters (visible while flying)
+  addFlame(aR.hand, 0, -0.14, 0, true);
+  addFlame(aL.hand, 0, -0.14, 0, true);
+
+  /* ---------------- back thruster pods + helmet fins ---------------- */
+  const backThrusters: THREE.Mesh[] = [];
+  for (const sx of [-1, 1]) {
+    part(body, new THREE.CylinderGeometry(0.06, 0.075, 0.2, 10), GUN, sx * 0.16, 0.32, -0.34, S);
+    const g = part(body, new THREE.CylinderGeometry(0.045, 0.045, 0.02, 10), 0x9defff, sx * 0.16, 0.21, -0.34, { emissive: 0x55ddff, ei: 3, metal: 0 });
+    g.castShadow = false;
+    backThrusters.push(g);
+    boxR(head, 0.03, 0.14, 0.13, GOLD, sx * 0.19, 0.0, -0.02, { rz: -sx * 0.15 }, G); // ear fin
+  }
 
   /* ---------------- legs ---------------- */
-  const flames: THREE.Mesh[] = [];
-  const flameGeo = new THREE.ConeGeometry(0.11, 0.8, 8);
-  flameGeo.rotateX(Math.PI);
   const makeLeg = (side: number) => {
     const hip = pivot(armorRoot, side * 0.2, 1.0, 0);
     part(hip, new THREE.SphereGeometry(0.1, 10, 8), SILVER, 0, -0.02, 0, S);
@@ -400,14 +440,10 @@ export function buildIronMan(): IronRig {
     box(knee, 0.26, 0.1, 0.44, RED, 0, -0.46, 0.08, R);
     box(knee, 0.2, 0.06, 0.14, GOLD, 0, -0.43, 0.24, G);
     const foot = pivot(knee, 0, -0.92, 0.05);
-    const f = new THREE.Mesh(
-      flameGeo,
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.4, 0.5), transparent: true, opacity: 0.9 })
-    );
-    f.position.set(0, -0.92, 0.05);
-    f.visible = false;
-    knee.add(f);
-    flames.push(f);
+    addFlame(knee, 0, -0.9, 0.05, false);
+    // sole thruster glow
+    const sole = box(knee, 0.16, 0.03, 0.2, 0xaaf4ff, 0, -0.9, 0.08, { emissive: 0x55ddff, ei: 3, metal: 0 });
+    sole.castShadow = false;
     return { hip, knee, foot };
   };
   const lR = makeLeg(-1);
@@ -429,6 +465,8 @@ export function buildIronMan(): IronRig {
     hipL: lL.hip,
     kneeL: lL.knee,
     flames,
+    handFlames,
+    backThrusters,
     mats: collectMats(armorRoot),
     mountC,
     mountBack,
@@ -444,8 +482,32 @@ export function buildIronMan(): IronRig {
 }
 
 /* ------------------------------------------------------------------ */
-/*  THANOS – bald purple Titan, dark vest, gold yoke, Infinity Gauntlet */
+/*  THANOS – 3 skins: Mad Titan / Titan Warlord / Void Tyrant          */
 /* ------------------------------------------------------------------ */
+
+export type ThanosSkin = "titan" | "warlord" | "void";
+
+export interface ThanosSkinInfo {
+  id: ThanosSkin;
+  name: string;
+  th: string;
+  desc: string;
+  color: string;
+  aura: number;
+}
+
+export const THANOS_SKINS: ThanosSkinInfo[] = [
+  { id: "titan", name: "MAD TITAN", th: "ไททันคลั่ง", desc: "ธานอสแบบดั้งเดิม — ผิวม่วง เสื้อกั๊กดำ สายคาดทอง", color: "#a06ad0", aura: 0xb070ff },
+  { id: "warlord", name: "TITAN WARLORD", th: "จอมสงครามไททัน", desc: "เกราะศึกสีเหล็กน้ำเงิน ไหล่เหล็กแหลม ผ้าคลุมสงคราม", color: "#6f8fc8", aura: 0xffd060 },
+  { id: "void", name: "VOID TYRANT", th: "จอมทรราชแห่งความว่างเปล่า", desc: "เกราะออบซิเดียน เส้นเลือดเรืองแดง มงกุฎเขา ผ้าคลุมเปลวเพลิง", color: "#ff3a2a", aura: 0xff3020 },
+];
+
+export interface ClothSeg {
+  pivot: THREE.Group;
+  base: number;
+  amp: number;
+  phase: number;
+}
 
 export interface ThanosRig {
   root: THREE.Group;
@@ -463,100 +525,223 @@ export interface ThanosRig {
   hipL: THREE.Group;
   kneeL: THREE.Group;
   stones: THREE.Mesh[];
+  halos: THREE.Mesh[];
+  eyes: THREE.Mesh[];
+  cloth: ClothSeg[];
+  veins: THREE.Mesh[];
+  skin: ThanosSkin;
   mats: FlashMat[];
 }
 
 export const THANOS_SCALE = 2.6;
 
-export function buildThanos(): ThanosRig {
-  const SKIN = 0x865aae;
-  const SKIN2 = 0x6f4796;
-  const SKIN_D = 0x4e2f6e;
-  const VEST = 0x1b1a2a;
-  const VEST2 = 0x2a2840;
-  const TG = 0xd4a037;
-  const BELT = 0x6b4a26;
-  const PANTS = 0x5b4a39;
-  const BOOT = 0x43362a;
-  const GAUNT = 0xb78a30;
+const PAL: Record<ThanosSkin, Record<string, number>> = {
+  titan: { skin: 0x865aae, skin2: 0x6f4796, skinD: 0x4e2f6e, armor: 0x1b1a2a, armor2: 0x2a2840, trim: 0xd4a037, belt: 0x6b4a26, pants: 0x5b4a39, boot: 0x43362a, gaunt: 0xb78a30, eye: 0xffd24a, cloth: 0x5a1620 },
+  warlord: { skin: 0x8a62b2, skin2: 0x724a9a, skinD: 0x4e2f6e, armor: 0x3a4766, armor2: 0x55668a, trim: 0xe3b84c, belt: 0x20263a, pants: 0x2b3040, boot: 0x232736, gaunt: 0xc79a3a, eye: 0xffe08a, cloth: 0x2a3550 },
+  void: { skin: 0x4c3669, skin2: 0x3b2a55, skinD: 0x1f1430, armor: 0x0f0c16, armor2: 0x1e1927, trim: 0x9c1424, belt: 0x15111c, pants: 0x16121e, boot: 0x0e0c14, gaunt: 0x2a1d30, eye: 0xff3a2a, cloth: 0x3a0710 },
+};
+
+export function buildThanos(skin: ThanosSkin = "titan"): ThanosRig {
+  const c = PAL[skin];
+  const SKIN = c.skin, SKIN2 = c.skin2, SKIN_D = c.skinD;
+  const ARM = c.armor, ARM2 = c.armor2, TG = c.trim, BELT = c.belt, PANTS = c.pants, BOOT = c.boot, GAUNT = c.gaunt;
+  const heavy = skin !== "titan";
+  const isVoid = skin === "void";
   const P = { metal: 0.05, rough: 0.72 }; // skin
-  const M = { metal: 0.65, rough: 0.35 }; // gold armor
+  const M = { metal: 0.7, rough: 0.3 }; // metal / gold
+  const A = isVoid ? { metal: 0.85, rough: 0.28 } : { metal: heavy ? 0.78 : 0.15, rough: heavy ? 0.32 : 0.8 }; // armor / vest
   const C = { metal: 0.05, rough: 0.9 }; // cloth / leather
+  const GLOW = (col: number, ei = 2.6) => ({ emissive: col, ei, metal: 0 });
 
   const root = new THREE.Group();
   const body = pivot(root, 0, 1.0, 0);
+  const veins: THREE.Mesh[] = [];
+  const vein = (parent: THREE.Object3D, w: number, h: number, d: number, x: number, y: number, z: number, rz = 0) => {
+    const m = boxR(parent, w, h, d, 0xff3a1a, x, y, z, { rz }, GLOW(0xff2a10, 3));
+    m.castShadow = false;
+    veins.push(m);
+    return m;
+  };
 
-  /* ---------------- pelvis / belt / vest ---------------- */
+  /* ---------------- pelvis / belt ---------------- */
   box(root, 0.9, 0.28, 0.56, PANTS, 0, 1.0, 0, C);
-  box(body, 1.14, 0.15, 0.66, BELT, 0, 0.1, 0, C); // wide leather belt
-  box(body, 0.36, 0.17, 0.06, TG, 0, 0.1, 0.34, M); // buckle
-  box(body, 0.2, 0.09, 0.07, VEST, 0, 0.1, 0.34, C);
-  box(body, 1.14, 0.78, 0.64, VEST, 0, 0.52, 0, C); // sleeveless vest
-  box(body, 0.04, 0.6, 0.05, VEST2, 0, 0.5, 0.33, C); // vest seam
-  box(body, 0.34, 0.5, 0.05, VEST2, 0.3, 0.52, 0.33, C);
-  box(body, 0.34, 0.5, 0.05, VEST2, -0.3, 0.52, 0.33, C);
-  // gold yoke (broad collar plate across the upper chest)
-  boxR(body, 0.98, 0.17, 0.68, TG, 0, 0.93, 0, { rx: 0.05 }, M);
-  box(body, 0.54, 0.22, 0.07, TG, 0, 0.77, 0.34, M);
-  boxR(body, 0.34, 0.1, 0.64, TG, 0.5, 0.9, 0, { rz: -0.3 }, M);
-  boxR(body, 0.34, 0.1, 0.64, TG, -0.5, 0.9, 0, { rz: 0.3 }, M);
-  box(body, 0.28, 0.12, 0.08, VEST, 0, 0.93, 0.35, C);
-  box(body, 0.92, 0.4, 0.06, VEST2, 0, 0.55, -0.34, C); // back panel
-  // neck
-  box(body, 0.34, 0.3, 0.34, SKIN2, 0, 1.12, 0, P);
+  box(body, 1.14, 0.15, 0.66, BELT, 0, 0.1, 0, C);
+  box(body, 0.36, 0.17, 0.06, TG, 0, 0.1, 0.34, M);
+  box(body, 0.2, 0.09, 0.07, ARM, 0, 0.1, 0.34, A);
+  for (const sx of [-1, 1]) {
+    box(body, 0.1, 0.12, 0.06, TG, sx * 0.45, 0.1, 0.34, M); // belt studs
+    box(body, 0.1, 0.12, 0.06, TG, sx * 0.25, 0.1, 0.34, M);
+  }
+
+  /* ---------------- torso ---------------- */
+  // skin chest / abs underneath (visible between plates)
+  box(body, 1.0, 0.6, 0.56, SKIN2, 0, 0.45, 0, P);
+  part(body, new THREE.SphereGeometry(0.3, 14, 10), SKIN, 0.26, 0.66, 0.2, { ...P, sx: 1.05, sy: 0.82, sz: 0.62 }); // pecs
+  part(body, new THREE.SphereGeometry(0.3, 14, 10), SKIN, -0.26, 0.66, 0.2, { ...P, sx: 1.05, sy: 0.82, sz: 0.62 });
+  for (let i = 0; i < 3; i++) {
+    box(body, 0.2, 0.1, 0.05, SKIN, 0.12, 0.4 - i * 0.12 + 0.12, 0.29, P); // abs
+    box(body, 0.2, 0.1, 0.05, SKIN, -0.12, 0.4 - i * 0.12 + 0.12, 0.29, P);
+  }
+
+  if (!heavy) {
+    // sleeveless vest + gold yoke (classic)
+    box(body, 1.14, 0.78, 0.64, ARM, 0, 0.52, 0, A);
+    box(body, 0.04, 0.6, 0.05, ARM2, 0, 0.5, 0.33, A);
+    box(body, 0.34, 0.5, 0.05, ARM2, 0.3, 0.52, 0.33, A);
+    box(body, 0.34, 0.5, 0.05, ARM2, -0.3, 0.52, 0.33, A);
+    boxR(body, 0.98, 0.17, 0.68, TG, 0, 0.93, 0, { rx: 0.05 }, M);
+    box(body, 0.54, 0.22, 0.07, TG, 0, 0.77, 0.34, M);
+    boxR(body, 0.34, 0.1, 0.64, TG, 0.5, 0.9, 0, { rz: -0.3 }, M);
+    boxR(body, 0.34, 0.1, 0.64, TG, -0.5, 0.9, 0, { rz: 0.3 }, M);
+    box(body, 0.28, 0.12, 0.08, ARM, 0, 0.93, 0.35, A);
+    box(body, 0.92, 0.4, 0.06, ARM2, 0, 0.55, -0.34, A);
+    // gold rivets
+    for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) box(body, 0.05, 0.05, 0.03, TG, sx * (0.12 + i * 0.16), 0.93, 0.36, M);
+  } else {
+    // full battle plate
+    box(body, 1.12, 0.66, 0.62, ARM, 0, 0.56, 0, A);
+    boxR(body, 0.5, 0.52, 0.14, ARM2, 0.27, 0.62, 0.3, { rx: -0.12, rz: -0.08 }, A);
+    boxR(body, 0.5, 0.52, 0.14, ARM2, -0.27, 0.62, 0.3, { rx: -0.12, rz: 0.08 }, A);
+    box(body, 0.1, 0.62, 0.15, TG, 0, 0.6, 0.33, M); // sternum ridge
+    // segmented abdomen bands
+    for (let i = 0; i < 3; i++) box(body, 0.84 - i * 0.06, 0.09, 0.5, i === 1 ? TG : ARM2, 0, 0.32 - i * 0.12, 0.04, M);
+    box(body, 1.0, 0.14, 0.7, TG, 0, 0.93, 0, M); // gorget
+    boxR(body, 0.4, 0.12, 0.7, ARM2, 0.52, 0.9, 0, { rz: -0.35 }, A);
+    boxR(body, 0.4, 0.12, 0.7, ARM2, -0.52, 0.9, 0, { rz: 0.35 }, A);
+    box(body, 0.96, 0.5, 0.08, ARM2, 0, 0.52, -0.34, A); // back plate
+    if (isVoid) {
+      // glowing sigil
+      const sig = part(body, polyGeo([[-0.17, 0.14], [0.17, 0.14], [0, -0.17]], 0.03), 0xff3a1a, 0, 0.64, 0.41, GLOW(0xff2a10, 3.5));
+      sig.castShadow = false;
+      veins.push(sig);
+      vein(body, 0.03, 0.4, 0.03, 0.5, 0.5, 0.34);
+      vein(body, 0.03, 0.4, 0.03, -0.5, 0.5, 0.34);
+      vein(body, 0.5, 0.025, 0.03, 0.0, 0.2, 0.37);
+    } else {
+      // gold chest emblem
+      const emb = part(body, polyGeo([[-0.14, 0.12], [0.14, 0.12], [0, -0.14]], 0.03), TG, 0, 0.64, 0.41, M);
+      emb.castShadow = false;
+    }
+    // tassets (skirt plates) hanging off the belt
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < 3; i++) boxR(root, 0.22, 0.32, 0.06, i === 1 ? TG : ARM2, sx * (0.17 + i * 0.17), 0.82, 0.31 + i * 0.01, { rz: sx * 0.06 * i }, M);
+    }
+  }
+  box(body, 0.34, 0.3, 0.34, SKIN2, 0, 1.12, 0, P); // neck
+  box(body, 0.05, 0.22, 0.05, SKIN_D, 0.13, 1.1, 0.14, P); // neck tendons
+  box(body, 0.05, 0.22, 0.05, SKIN_D, -0.13, 1.1, 0.14, P);
 
   /* ---------------- head ---------------- */
   const head = pivot(body, 0, 1.38, 0);
-  part(head, new THREE.SphereGeometry(0.29, 22, 16), SKIN, 0, 0.05, -0.01, { ...P, sx: 1.0, sy: 1.12, sz: 1.02 }); // bald skull
+  part(head, new THREE.SphereGeometry(0.29, 24, 18), SKIN, 0, 0.05, -0.01, { ...P, sx: 1.0, sy: 1.12, sz: 1.02 });
   box(head, 0.4, 0.24, 0.36, SKIN2, 0, -0.27, 0.07, P); // heavy jaw
-  box(head, 0.28, 0.12, 0.12, SKIN2, 0, -0.36, 0.2, P); // big chin
+  box(head, 0.28, 0.12, 0.12, SKIN2, 0, -0.36, 0.2, P); // chin
   box(head, 0.026, 0.09, 0.03, SKIN_D, 0, -0.35, 0.265, P); // chin cleft
-  box(head, 0.52, 0.1, 0.14, SKIN2, 0, 0.12, 0.2, P); // heavy brow ridge
-  for (const dy of [0.2, 0.25, 0.3]) box(head, 0.3 - (dy - 0.2) * 0.8, 0.018, 0.03, SKIN_D, 0, dy, 0.265, P); // forehead furrows
-  box(head, 0.11, 0.045, 0.04, 0xf3e6b8, 0.13, 0.05, 0.245, { emissive: 0xffd24a, ei: 1.4, metal: 0 });
-  box(head, 0.11, 0.045, 0.04, 0xf3e6b8, -0.13, 0.05, 0.245, { emissive: 0xffd24a, ei: 1.4, metal: 0 });
-  boxR(head, 0.12, 0.03, 0.05, SKIN_D, 0.14, 0.1, 0.262, { rz: 0.3 }, P); // angry brows
-  boxR(head, 0.12, 0.03, 0.05, SKIN_D, -0.14, 0.1, 0.262, { rz: -0.3 }, P);
+  boxR(head, 0.1, 0.2, 0.14, SKIN2, 0.2, -0.22, 0.06, { rz: -0.3 }, P); // jaw wings
+  boxR(head, 0.1, 0.2, 0.14, SKIN2, -0.2, -0.22, 0.06, { rz: 0.3 }, P);
+  box(head, 0.52, 0.1, 0.14, SKIN2, 0, 0.12, 0.2, P); // brow ridge
+  for (const dy of [0.2, 0.25, 0.3]) box(head, 0.3 - (dy - 0.2) * 0.8, 0.018, 0.03, SKIN_D, 0, dy, 0.265, P);
+  const eyeCol = c.eye;
+  const eyes: THREE.Mesh[] = [];
+  for (const sx of [1, -1]) {
+    const e = box(head, 0.11, 0.045, 0.04, 0xfff0c0, sx * 0.13, 0.05, 0.245, { emissive: eyeCol, ei: isVoid ? 4 : 1.6, metal: 0 });
+    e.castShadow = false;
+    e.userData.base = eyeCol;
+    eyes.push(e);
+    boxR(head, 0.12, 0.03, 0.05, SKIN_D, sx * 0.14, 0.1, 0.262, { rz: sx * 0.3 }, P); // angry brows
+    box(head, 0.15, 0.11, 0.1, SKIN2, sx * 0.17, -0.07, 0.2, P); // cheekbones
+    box(head, 0.06, 0.15, 0.1, SKIN2, sx * 0.29, 0.0, 0.0, P); // ears
+    box(head, 0.025, 0.07, 0.03, SKIN_D, sx * 0.17, -0.02, 0.255, P); // face scar lines
+  }
   box(head, 0.1, 0.16, 0.11, SKIN2, 0, -0.03, 0.27, P); // nose
   box(head, 0.2, 0.02, 0.04, SKIN_D, 0, -0.18, 0.255, P); // grimace
-  box(head, 0.15, 0.11, 0.1, SKIN2, 0.17, -0.07, 0.2, P); // cheekbones
-  box(head, 0.15, 0.11, 0.1, SKIN2, -0.17, -0.07, 0.2, P);
-  box(head, 0.06, 0.15, 0.1, SKIN2, 0.29, 0.0, 0.0, P); // ears
-  box(head, 0.06, 0.15, 0.1, SKIN2, -0.29, 0.0, 0.0, P);
+  if (heavy) {
+    box(head, 0.62, 0.05, 0.3, TG, 0, 0.27, 0.12, M).rotation.x = -0.1; // brow band
+    const gem = box(head, 0.06, 0.08, 0.04, isVoid ? 0xff2a10 : 0x7ad0ff, 0, 0.27, 0.28, GLOW(isVoid ? 0xff2a10 : 0x40b8ff, 3));
+    gem.castShadow = false;
+    if (isVoid) veins.push(gem);
+    // cheek guards
+    box(head, 0.05, 0.2, 0.2, ARM2, 0.31, -0.1, 0.05, A);
+    box(head, 0.05, 0.2, 0.2, ARM2, -0.31, -0.1, 0.05, A);
+  }
+  if (isVoid) {
+    // crown of horns
+    for (let i = 0; i < 7; i++) {
+      const a = -1.15 + i * 0.383;
+      const h = i === 3 ? 0.55 : i % 2 ? 0.34 : 0.42;
+      part(head, new THREE.ConeGeometry(0.045, h, 6), ARM, Math.sin(a) * 0.3, 0.3 + (i === 3 ? 0.08 : 0), -0.05 - Math.cos(a) * 0.04, { ...A, rx: -0.35, rz: -a * 0.45 });
+    }
+    box(head, 0.62, 0.05, 0.5, ARM, 0, 0.25, -0.02, A);
+    vein(head, 0.02, 0.2, 0.02, 0, 0.18, 0.28);
+    vein(head, 0.02, 0.1, 0.02, 0.12, -0.12, 0.27, 0.3);
+    vein(head, 0.02, 0.1, 0.02, -0.12, -0.12, 0.27, -0.3);
+  }
 
-  /* ---------------- arms (bare, huge muscle) ---------------- */
+  /* ---------------- arms ---------------- */
   const makeArm = (side: number) => {
     const sh = pivot(body, side * 0.82, 0.93, 0);
     part(sh, new THREE.SphereGeometry(0.32, 16, 12), SKIN, 0, 0.02, 0, { ...P, sx: 1.05, sy: 0.95 }); // deltoid
     part(sh, new THREE.CapsuleGeometry(0.21, 0.4, 4, 12), SKIN, 0, -0.36, 0, { ...P, sx: 1.05, sz: 1.0 }); // bicep
+    part(sh, new THREE.SphereGeometry(0.12, 10, 8), SKIN2, 0, -0.3, 0.12, { ...P, sx: 1.2, sy: 1.5, sz: 0.8 }); // bicep peak
     box(sh, 0.04, 0.4, 0.06, SKIN_D, side * 0.2, -0.36, 0.06, P); // vein shading
     const el = pivot(sh, 0, -0.66, 0);
     part(el, new THREE.CapsuleGeometry(0.19, 0.34, 4, 12), SKIN2, 0, -0.3, 0, { ...P, sx: 1.0 });
+    part(el, new THREE.SphereGeometry(0.2, 12, 10), SKIN2, 0, -0.1, 0, { ...P, sx: 1.05 }); // forearm bulk
     const hand = pivot(el, 0, -0.64, 0);
     box(hand, 0.34, 0.3, 0.34, SKIN2, 0, -0.1, 0, P);
-    for (let i = 0; i < 4; i++) box(hand, 0.07, 0.1, 0.08, SKIN2, -0.12 + i * 0.08, -0.29, 0.1, P); // fingers
+    for (let i = 0; i < 4; i++) box(hand, 0.07, 0.12, 0.08, SKIN2, -0.12 + i * 0.08, -0.3, 0.1, P); // fingers
+    box(hand, 0.08, 0.1, 0.08, SKIN2, side * 0.2, -0.16, 0.06, P); // thumb
+    if (heavy) {
+      // spiked pauldron + bracer
+      part(sh, new THREE.SphereGeometry(0.42, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), ARM2, side * 0.04, 0.1, 0, { ...A, sx: 1.15, sy: 0.85, sz: 1.05 });
+      box(sh, 0.64, 0.06, 0.66, TG, side * 0.04, 0.08, 0, M).rotation.z = -side * 0.12;
+      for (let i = 0; i < 3; i++) {
+        part(sh, new THREE.ConeGeometry(0.07, isVoid ? 0.5 : 0.34, 6), isVoid ? ARM : TG, side * (0.14 + i * 0.1), 0.42 - i * 0.08, 0.0, { ...M, rz: -side * (0.35 + i * 0.35) });
+      }
+      box(el, 0.34, 0.34, 0.34, ARM2, 0, -0.38, 0, A);
+      box(el, 0.38, 0.06, 0.38, TG, 0, -0.2, 0, M);
+      box(el, 0.38, 0.06, 0.38, TG, 0, -0.56, 0, M);
+      if (isVoid) {
+        vein(sh, 0.025, 0.5, 0.025, side * 0.19, -0.35, 0.12);
+        vein(el, 0.025, 0.4, 0.025, side * 0.1, -0.3, 0.2);
+      }
+    } else {
+      boxR(el, 0.36, 0.1, 0.36, TG, 0, -0.5, 0, { rz: 0 }, M); // leather wrist wrap
+    }
     return { sh, el, hand };
   };
   const aR = makeArm(-1);
   const aL = makeArm(1);
 
   /* ---------------- Infinity Gauntlet (on the +x arm) ---------------- */
-  box(aL.el, 0.5, 0.5, 0.5, GAUNT, 0, -0.62, 0, M); // forearm guard
-  box(aL.el, 0.56, 0.08, 0.56, TG, 0, -0.38, 0, M); // flared cuff
+  box(aL.el, 0.5, 0.5, 0.5, GAUNT, 0, -0.62, 0, M);
+  box(aL.el, 0.56, 0.08, 0.56, TG, 0, -0.38, 0, M);
   box(aL.el, 0.54, 0.05, 0.54, TG, 0, -0.84, 0, M);
   box(aL.el, 0.14, 0.34, 0.06, TG, 0, -0.62, 0.27, M);
-  box(aL.hand, 0.5, 0.4, 0.5, GAUNT, 0, -0.1, 0, M); // gauntlet hand
+  for (const sx of [-1, 1]) boxR(aL.el, 0.06, 0.4, 0.4, TG, sx * 0.27, -0.62, 0, { rz: sx * 0.12 }, M);
+  box(aL.hand, 0.5, 0.4, 0.5, GAUNT, 0, -0.1, 0, M);
   box(aL.hand, 0.46, 0.06, 0.46, TG, 0, 0.08, 0, M);
-  for (let i = 0; i < 4; i++) box(aL.hand, 0.09, 0.14, 0.1, GAUNT, -0.15 + i * 0.1, -0.34, 0.12, M); // gauntlet fingers
+  for (let i = 0; i < 4; i++) {
+    box(aL.hand, 0.09, 0.14, 0.1, GAUNT, -0.15 + i * 0.1, -0.34, 0.12, M);
+    box(aL.hand, 0.09, 0.05, 0.11, TG, -0.15 + i * 0.1, -0.42, 0.12, M); // knuckle tips
+  }
   const stoneColors = [0x3aa0ff, 0xff3030, 0xb04aff, 0xff9a1a, 0x30ff6a, 0xffe93a];
   const stones: THREE.Mesh[] = [];
-  stoneColors.forEach((c, i) => {
+  const halos: THREE.Mesh[] = [];
+  stoneColors.forEach((col, i) => {
     const gx = 0.27;
     const gy = -0.04 - Math.floor(i / 3) * 0.15;
     const gz = -0.15 + (i % 3) * 0.15;
-    box(aL.hand, 0.05, 0.13, 0.13, TG, gx - 0.02, gy, gz, M); // bezel
-    const s = part(aL.hand, new THREE.SphereGeometry(0.055, 12, 10), c, gx + 0.015, gy, gz, { emissive: c, ei: 3.5, metal: 0 });
+    box(aL.hand, 0.05, 0.13, 0.13, TG, gx - 0.02, gy, gz, M);
+    const s = part(aL.hand, new THREE.SphereGeometry(0.055, 14, 10), col, gx + 0.015, gy, gz, { emissive: col, ei: 3.5, metal: 0 });
     stones.push(s);
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.11, 12, 8),
+      new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    halo.position.set(gx + 0.03, gy, gz);
+    aL.hand.add(halo);
+    halos.push(halo);
   });
   const muzzle = new THREE.Object3D();
   muzzle.position.set(0, -0.4, 0);
@@ -568,17 +753,55 @@ export function buildThanos(): ThanosRig {
     box(hip, 0.42, 0.58, 0.44, PANTS, 0, -0.28, 0, C);
     const knee = pivot(hip, 0, -0.56, 0);
     box(knee, 0.38, 0.46, 0.4, PANTS, 0, -0.22, 0, C);
-    // gold knee guard with a dark triangle emblem
-    box(knee, 0.34, 0.26, 0.1, TG, 0, 0.02, 0.23, M);
+    box(knee, 0.34, 0.26, 0.1, TG, 0, 0.02, 0.23, M); // knee guard
     part(knee, polyGeo([[-0.09, 0.07], [0.09, 0.07], [0, -0.08]], 0.04), 0x2a2218, 0, 0.02, 0.29, C);
-    // tall boot
-    box(knee, 0.42, 0.34, 0.44, BOOT, 0, -0.32, 0, C);
+    box(knee, 0.42, 0.34, 0.44, BOOT, 0, -0.32, 0, C); // tall boot
     box(knee, 0.3, 0.1, 0.1, TG, 0, -0.2, 0.24, M);
     box(knee, 0.44, 0.14, 0.64, BOOT, 0, -0.5, 0.1, C);
+    box(knee, 0.46, 0.05, 0.66, TG, 0, -0.43, 0.1, M); // boot sole trim
+    if (heavy) {
+      box(knee, 0.4, 0.42, 0.12, ARM2, 0, -0.3, 0.24, A); // greave
+      part(knee, new THREE.ConeGeometry(0.06, 0.3, 6), isVoid ? ARM : TG, 0, 0.04, 0.36, { ...M, rx: Math.PI / 2 }); // knee spike
+      box(hip, 0.48, 0.12, 0.5, ARM2, 0, -0.06, 0, A); // thigh plate
+      if (isVoid) vein(knee, 0.025, 0.3, 0.02, 0, -0.3, 0.31);
+    }
     return { hip, knee };
   };
   const lR = makeLeg(-1);
   const lL = makeLeg(1);
+
+  /* ---------------- cloth (animated by the game) ---------------- */
+  const cloth: ClothSeg[] = [];
+  const clothMat = (w: number, h: number, parent: THREE.Object3D, col: number, o: MatOpts = {}) => {
+    const m = box(parent, w, h, 0.035, col, 0, -h / 2, 0, { metal: 0.02, rough: 0.95, ...o });
+    return m;
+  };
+  const chain = (parent: THREE.Object3D, x: number, y: number, z: number, widths: number[], h: number, col: number, base: number, amp: number, o: MatOpts = {}) => {
+    let par: THREE.Object3D = parent;
+    widths.forEach((w, i) => {
+      const pv = pivot(par, i === 0 ? x : 0, i === 0 ? y : -h + 0.02, i === 0 ? z : 0.0);
+      clothMat(w, h, pv, col, o);
+      cloth.push({ pivot: pv, base, amp: amp * (1 + i * 0.35), phase: i * 0.7 + x * 3 });
+      par = pv;
+    });
+  };
+  if (!heavy) {
+    // belt tabards (front + back)
+    chain(root, 0, 1.0, 0.32, [0.46, 0.42, 0.34], 0.26, c.cloth, -0.05, 0.06);
+    chain(root, 0, 1.0, -0.32, [0.52, 0.46, 0.38], 0.28, c.cloth, 0.08, 0.07);
+  } else if (skin === "warlord") {
+    // war-cape from the pauldrons
+    chain(body, 0, 0.98, -0.36, [1.2, 1.28, 1.34, 1.3], 0.5, c.cloth, 0.1, 0.07);
+    chain(root, 0, 1.0, 0.33, [0.4, 0.34], 0.3, c.cloth, -0.05, 0.05);
+  } else {
+    // void: long flame cape with glowing hem
+    chain(body, 0, 0.98, -0.36, [1.2, 1.3, 1.36, 1.3, 1.1], 0.5, c.cloth, 0.1, 0.09);
+    const hem = cloth[cloth.length - 1].pivot;
+    const hemGlow = box(hem, 1.1, 0.05, 0.05, 0xff4a1a, 0, -0.5, 0, GLOW(0xff3a10, 3.5));
+    hemGlow.castShadow = false;
+    veins.push(hemGlow);
+    chain(root, 0, 1.0, 0.33, [0.4, 0.34], 0.3, c.cloth, -0.05, 0.05);
+  }
 
   return {
     root,
@@ -596,6 +819,123 @@ export function buildThanos(): ThanosRig {
     hipL: lL.hip,
     kneeL: lL.knee,
     stones,
+    halos,
+    eyes,
+    cloth,
+    veins,
+    skin,
     mats: collectMats(root),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  ULTRON PRIME – hovering drone commander                            */
+/* ------------------------------------------------------------------ */
+
+export interface UltronRig {
+  root: THREE.Group;
+  core: THREE.Mesh;
+  eyes: THREE.Mesh[];
+  rings: THREE.Mesh[];
+  flame: THREE.Mesh;
+  fins: THREE.Group[];
+  armR: THREE.Group;
+  armL: THREE.Group;
+  muzzles: THREE.Mesh[];
+  mats: FlashMat[];
+}
+
+export function buildUltron(): UltronRig {
+  const METAL = 0xa7b2c0;
+  const DARK = 0x1c2430;
+  const STEEL = 0x66737f;
+  const RED = 0xff2a3c;
+  const MT = { metal: 0.92, rough: 0.22 };
+  const DK = { metal: 0.8, rough: 0.35 };
+  const GL = (ei = 3.5) => ({ emissive: RED, ei, metal: 0 });
+  const root = new THREE.Group();
+
+  // torso: tapered chest block, waist, hover pod
+  part(root, new THREE.CylinderGeometry(0.62, 0.38, 1.1, 8), METAL, 0, 0.05, 0, { ...MT, sz: 0.62 });
+  box(root, 0.8, 0.3, 0.46, STEEL, 0, 0.5, 0.02, MT); // upper chest plate
+  boxR(root, 0.42, 0.52, 0.12, METAL, 0.22, 0.2, 0.28, { rx: -0.12, rz: -0.1 }, MT);
+  boxR(root, 0.42, 0.52, 0.12, METAL, -0.22, 0.2, 0.28, { rx: -0.12, rz: 0.1 }, MT);
+  const core = part(root, new THREE.SphereGeometry(0.17, 18, 14), RED, 0, 0.2, 0.34, { ...GL(5), sz: 0.5 });
+  core.castShadow = false;
+  const coreRing = part(root, new THREE.TorusGeometry(0.22, 0.03, 8, 20), STEEL, 0, 0.2, 0.33, MT);
+  coreRing.castShadow = false;
+  for (let i = 0; i < 5; i++) box(root, 0.5 - i * 0.05, 0.04, 0.3, DARK, 0, -0.18 - i * 0.1, 0.02, DK); // waist segments
+  part(root, new THREE.ConeGeometry(0.34, 0.9, 10), DARK, 0, -1.0, 0, { ...DK, rx: Math.PI }); // hover pod
+  for (let i = 0; i < 3; i++) part(root, new THREE.TorusGeometry(0.2 + i * 0.05, 0.025, 6, 16), RED, 0, -0.78 - i * 0.2, 0, { ...GL(2.5), rx: Math.PI / 2 });
+  const flameGeo = new THREE.ConeGeometry(0.28, 1.4, 12, 1, true);
+  flameGeo.rotateX(Math.PI);
+  const flame = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.5, 0.35), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  flame.position.set(0, -2.2, 0);
+  root.add(flame);
+
+  // neck + head
+  part(root, new THREE.CylinderGeometry(0.1, 0.14, 0.2, 8), DARK, 0, 0.75, 0, DK);
+  const head = pivot(root, 0, 1.0, 0.02);
+  part(head, new THREE.SphereGeometry(0.34, 20, 14), METAL, 0, 0, -0.02, { ...MT, sx: 0.88, sy: 1.12, sz: 1.0 });
+  box(head, 0.4, 0.34, 0.12, STEEL, 0, -0.02, 0.28, MT); // faceplate
+  box(head, 0.3, 0.18, 0.14, DARK, 0, -0.14, 0.3, DK); // jaw
+  for (let i = 0; i < 4; i++) box(head, 0.2, 0.012, 0.03, RED, 0, -0.1 - i * 0.04, 0.375, GL(2)); // mouth vents
+  const eyes: THREE.Mesh[] = [];
+  for (const sx of [-1, 1]) {
+    const e = boxR(head, 0.15, 0.04, 0.03, RED, sx * 0.1, 0.06, 0.352, { rz: -sx * 0.25 }, GL(6));
+    e.castShadow = false;
+    eyes.push(e);
+    boxR(head, 0.04, 0.22, 0.3, DARK, sx * 0.31, 0.0, 0.0, { rz: -sx * 0.1 }, DK); // ear vents
+  }
+  const crest = part(head, polyGeo([[-0.04, 0], [0.04, 0], [0.02, 0.35], [-0.04, 0.55]], 0.05), METAL, 0, 0.3, -0.12, { ...MT, rx: -0.4 });
+  crest.castShadow = true;
+  for (const sx of [-1, 1]) {
+    boxR(head, 0.04, 0.4, 0.05, STEEL, sx * 0.17, 0.3, -0.12, { rz: -sx * 0.18, rx: -0.35 }, MT);
+  }
+
+  // shoulders + arms
+  const mkArm = (side: number) => {
+    const sh = pivot(root, side * 0.82, 0.5, 0);
+    part(sh, new THREE.SphereGeometry(0.28, 14, 10), METAL, 0, 0, 0, MT);
+    for (let i = 0; i < 3; i++) part(sh, new THREE.ConeGeometry(0.06, 0.36, 6), STEEL, side * (0.1 + i * 0.07), 0.24 - i * 0.04, 0, { ...MT, rz: -side * (0.5 + i * 0.4) });
+    box(sh, 0.22, 0.62, 0.24, DARK, 0, -0.4, 0, DK);
+    part(sh, new THREE.SphereGeometry(0.13, 10, 8), STEEL, 0, -0.76, 0, MT);
+    const el = pivot(sh, 0, -0.78, 0);
+    box(el, 0.26, 0.55, 0.28, METAL, 0, -0.3, 0.0, MT);
+    box(el, 0.3, 0.1, 0.32, DARK, 0, -0.06, 0, DK);
+    const muzzle = part(el, new THREE.CylinderGeometry(0.075, 0.09, 0.3, 10), RED, 0, -0.66, 0, { ...GL(3.5), rx: 0 });
+    for (let i = 0; i < 3; i++) box(el, 0.03, 0.2, 0.05, STEEL, -0.1 + i * 0.1, -0.7, 0.14, MT); // fingers
+    return { sh, el, muzzle };
+  };
+  const aR = mkArm(-1);
+  const aL = mkArm(1);
+  aR.sh.rotation.x = -0.9; // arms ready
+  aL.sh.rotation.x = -0.9;
+  aR.el.rotation.x = -0.4;
+  aL.el.rotation.x = -0.4;
+  aR.sh.rotation.z = -0.25;
+  aL.sh.rotation.z = 0.25;
+
+  // blade fins fanned behind the torso
+  const fins: THREE.Group[] = [];
+  for (let i = 0; i < 6; i++) {
+    const side = i < 3 ? -1 : 1;
+    const k = i % 3;
+    const g = pivot(root, side * 0.3, 0.45 - k * 0.12, -0.34);
+    g.rotation.z = -side * (0.5 + k * 0.45);
+    g.rotation.x = -0.25;
+    part(g, finGeo(1.5 - k * 0.2, 0.2, 0.04), DARK, 0, 0, 0, DK);
+    part(g, finGeo(1.3 - k * 0.2, 0.05, 0.05), RED, 0, 0.1, 0, GL(2.6)).castShadow = false;
+    fins.push(g);
+  }
+
+  // orbiting halo rings
+  const rings: THREE.Mesh[] = [];
+  for (let i = 0; i < 2; i++) {
+    const r = part(root, new THREE.TorusGeometry(1.45 + i * 0.3, 0.025, 6, 48), RED, 0, 0.3, -0.1, { ...GL(1.6), rx: Math.PI / 2 + i * 0.5, rz: i * 0.8 });
+    r.castShadow = false;
+    rings.push(r);
+  }
+
+  return { root, core, eyes, rings, flame, fins, armR: aR.sh, armL: aL.sh, muzzles: [aR.muzzle, aL.muzzle], mats: collectMats(root) };
 }
