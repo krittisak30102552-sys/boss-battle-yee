@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#101a20" />
+    <title>GORGE — Third Person Explorer</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="game-canvas"></canvas>
+
+    <div id="hud" class="hud">
+      <div class="brand">
+        <span class="brand-mark">G</span>
+        <div><strong>GORGE</strong><small>THIRD PERSON EXPLORER</small></div>
+      </div>
+      <div class="status-pill"><span class="status-dot"></span><span id="status-text">กำลังเตรียมฉาก…</span></div>
+      <div class="help-card">
+        <b>การควบคุม</b>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> เดิน</span>
+        <span>ลากเมาส์ หมุนกล้อง</span>
+        <span><kbd>Space</kbd> กระโดด</span>
+        <span>ล้อเมาส์ ซูมกล้อง</span>
+      </div>
+    </div>
+
+    <div id="welcome" class="welcome">
+      <div class="welcome-card">
+        <div class="eyebrow">A SMALL WORLD TO EXPLORE</div>
+        <h1>Gorge<span>.</span></h1>
+        <p>เดินสำรวจแผนที่ในมุมมองบุคคลที่ 3</p>
+        <div id="loading-line" class="loading-line"><i id="loading-bar"></i></div>
+        <p id="loading-message" class="loading-message">กำลังโหลดโมเดลแผนที่…</p>
+        <button id="start-button" disabled>กำลังเตรียมแผนที่</button>
+        <p class="fine-print">WASD เดิน · เมาส์หมุนกล้อง · Space กระโดด</p>
+      </div>
+    </div>
+
+    <div id="map-error" class="map-error" hidden>
+      <strong>ยังไม่พบไฟล์แผนที่</strong>
+      <p>อัปโหลดไฟล์ <code>gorge.glb</code> ไปที่ <code>gorge-world/assets/gorge.glb</code> ใน Repository แล้วเปิดเกมใหม่</p>
+    </div>
+
+    <div id="touch-controls" class="touch-controls">
+      <div id="stick-zone" class="stick-zone" aria-label="จอยสติ๊กเดิน">
+        <div id="stick-knob" class="stick-knob"></div>
+      </div>
+      <button id="jump-button" class="jump-button">JUMP</button>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
