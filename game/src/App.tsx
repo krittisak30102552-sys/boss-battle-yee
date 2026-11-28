@@ -8,8 +8,11 @@ const INITIAL: HudState = {
   playerHp: 300,
   playerMax: 300,
   tonyExposed: false,
-  bossHp: 50000,
-  bossMax: 50000,
+  bossHp: 20000,
+  bossMax: 20000,
+  ultronHp: 2000000,
+  ultronMax: 2000000,
+  ultronActive: false,
   boost: 100,
   weapon: 0,
   morphing: false,
@@ -329,7 +332,7 @@ useEffect(() => {
             <div className="flex items-end justify-between mb-1 px-1">
               <div className="text-lg font-black tracking-[0.25em] drop-shadow" style={{ color: skinInfo.color }}>THANOS <span className="text-[10px] tracking-[0.3em] text-white/50">· {skinInfo.name}</span></div>
               <div className="text-xs text-purple-200/80">
-                {hud.phase === 2 ? "PHASE II · RAGE" : "PHASE I"} · {hud.bossHp}/{hud.bossMax}
+                {hud.phase === 2 ? "PHASE II · RAGE" : "PHASE I"} · {hud.bossHp.toLocaleString()}/{hud.bossMax.toLocaleString()}
               </div>
             </div>
             <div className="relative">
@@ -338,6 +341,17 @@ useEffect(() => {
             </div>
             <div className="h-7 mt-2 text-center text-sm font-bold text-amber-300 drop-shadow animate-pulse">{hud.action}</div>
           </div>
+
+          {hud.ultronActive && (
+            <div className="absolute top-[92px] left-1/2 -translate-x-1/2 w-[min(620px,82vw)]">
+              <div className="mb-1 flex justify-between px-1 text-xs font-black text-red-200">
+                <span>ULTRON · THE SPEED DEMON</span>
+                <span>{hud.ultronHp.toLocaleString()}/{hud.ultronMax.toLocaleString()}</span>
+              </div>
+              <Bar value={hud.ultronHp} max={hud.ultronMax} color="linear-gradient(90deg,#991b1b,#fb7185,#f97316)" h="h-3" />
+              <div className="mt-1 text-center text-[10px] font-black tracking-[0.2em] text-red-200/80">LIGHTSPEED ASSAULT · พุ่งความเร็วแสง</div>
+            </div>
+          )}
 
           {/* mission hint */}
           {hud.hint && (
