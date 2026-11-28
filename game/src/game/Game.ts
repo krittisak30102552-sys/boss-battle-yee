@@ -99,7 +99,7 @@ export const WEAPON_INFO: WeaponInfo[] = [
 /* ------------------------------------------------------------------ */
 
 const ARENA_R = 58;
-const BOSS_MAX = 50_000;
+const BOSS_MAX = 20_000;
 const PLAYER_MAX = 20_000;
 const TONY_MAX = 250;
 const TAU = Math.PI * 2;
