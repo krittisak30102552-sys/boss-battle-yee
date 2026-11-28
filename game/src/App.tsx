@@ -142,6 +142,18 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [mp, mpUid, hud.status]);
 
+  useEffect(() => {
+    const game = gameRef.current;
+    const room = mpRoom;
+    if (!game || !room || !mpUid) return;
+    game.setCombatEventSender((event) => { void mp.publishCombatEvent(event).catch((e) => setMpError(e instanceof Error ? e.message : String(e))); });
+    let active = true;
+    let off: (() => void) | undefined;
+    try { off = mp.onCombatEvent((event) => { if (active) game.applyNetworkCombatEvent(event); }); }
+    catch (e) { setMpError(e instanceof Error ? e.message : String(e)); }
+    return () => { active = false; off?.(); game.setCombatEventSender(null); };
+  }, [mp, mpRoom?.code, mpUid]);
+
   // One boss simulation per room: the host publishes it; other pilots only render its snapshot.
   useEffect(() => {
     const game = gameRef.current;
