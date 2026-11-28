@@ -4,6 +4,7 @@ import { buildIronMan, buildThanos, setFlash, IronRig, ThanosRig, THANOS_SCALE }
 import { NanoSystem, WEAPON_COUNT } from "./nano";
 import { SuitSystem } from "./suit";
 import { initAudio, sfx } from "./audio";
+import type { BossNetworkState } from "./multiplayer";
 
 const RED_C = 0xb5141f;
 const GOLD_C = 0xe9b13a;
@@ -2734,6 +2735,22 @@ private updatePlayerPose(dt: number) {
   /* ---------------------------------------------------------------- */
   /*  Boss                                                            */
   /* ---------------------------------------------------------------- */
+
+  private bossAuthority = true;
+  setBossAuthority(authority: boolean) { this.bossAuthority = authority; }
+  getBossNetworkState(): BossNetworkState {
+    const b = this.boss;
+    return { x:b.pos.x,y:b.pos.y,z:b.pos.z,yaw:b.yaw,hp:b.hp,phase:b.phase,state:b.state,t:b.t,walk:b.walk,flash:b.flash,think:b.think,did:b.did,updatedAt:Date.now() };
+  }
+  applyBossNetworkState(s: BossNetworkState) {
+    if (this.bossAuthority) return;
+    const b = this.boss;
+    b.pos.set(s.x,s.y,s.z); b.yaw=s.yaw; b.hp=s.hp; b.phase=s.phase;
+    b.state=s.state as typeof b.state; b.t=s.t; b.walk=s.walk; b.flash=s.flash;
+    b.think=s.think; b.did=s.did;
+    this.updateBossPose(0.05);
+    this.emitHud(false);
+  }
 
   private damageBoss(amount: number, point: THREE.Vector3, noUlt = false): boolean {
     const b = this.boss;
