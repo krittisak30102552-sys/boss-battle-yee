@@ -36,6 +36,10 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
         run: npm run build
+      - name: Add standalone Gorge Explorer page
+        run: |
+          mkdir -p game/dist/gorge-world
+          cp -R gorge-world/. game/dist/gorge-world/
       - name: Configure Pages
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact
