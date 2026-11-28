@@ -268,7 +268,7 @@ interface Meteor {
   done: boolean;
 }
 
-type BossState = "idle" | "punch" | "slam" | "orbs" | "meteor" | "rush" | "beam" | "stagger" | "roar" | "dead";
+type BossState = "idle" | "punch" | "slam" | "orbs" | "meteor" | "rush" | "beam" | "stoneBurst" | "singularity" | "stagger" | "roar" | "dead";
 
 /* ------------------------------------------------------------------ */
 /*  GAME                                                               */
@@ -423,6 +423,9 @@ private nano: NanoSystem;
     bend: new THREE.Vector3(),
   };
   private bpose = { shR: 0, elR: -0.2, shL: 0, elL: -0.2, lean: 0, crouch: 0, headX: 0, fall: 0 };
+  private ultron = new THREE.Group();
+  private ultronActive = false;
+  private ultronFire = 2.5;
 
   // scratch
   private v1 = new THREE.Vector3();
@@ -473,6 +476,8 @@ private nano: NanoSystem;
     this.brig = buildThanos();
     this.brig.root.scale.setScalar(THANOS_SCALE);
     this.scene.add(this.brig.root);
+    this.buildUltron();
+    this.scene.add(this.ultron);
 
     this.fx = new FX(this.scene);
 
@@ -537,6 +542,49 @@ private nano: NanoSystem;
   private suit: SuitSystem;
 
   private wingsManual = false;
+
+  private buildUltron() {
+    const g = this.ultron;
+    const metal = new THREE.MeshStandardMaterial({ color: 0x9da8b5, metalness: 0.88, roughness: 0.24, emissive: 0x182b42, emissiveIntensity: 0.7 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x202b38, metalness: 0.8, roughness: 0.32 });
+    const red = new THREE.MeshBasicMaterial({ color: 0xff263c });
+    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x:number,y:number,z:number,sx=1,sy=1,sz=1) => {
+      const m = new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.scale.set(sx,sy,sz); m.castShadow=true; g.add(m); return m;
+    };
+    add(new THREE.BoxGeometry(1.15,1.25,0.55),metal,0,0,0);
+    add(new THREE.SphereGeometry(0.43,16,12),metal,0,0.95,0.02,0.9,1.05,0.85);
+    add(new THREE.BoxGeometry(0.48,0.18,0.08),red,0,0.98,0.42);
+    add(new THREE.BoxGeometry(0.42,0.72,0.42),dark,0,-0.88,0);
+    for (const side of [-1,1]) {
+      add(new THREE.BoxGeometry(0.42,0.82,0.42),metal,side*0.88,0.05,0);
+      add(new THREE.BoxGeometry(0.28,0.7,0.3),dark,side*0.88,-0.62,0);
+      add(new THREE.BoxGeometry(0.38,0.95,0.38),metal,side*0.38,-1.42,0);
+      add(new THREE.BoxGeometry(0.22,0.5,0.24),dark,side*0.38,-2.1,0.08);
+      add(new THREE.BoxGeometry(0.18,0.7,0.18),metal,side*0.92,0.82,-0.02);
+    }
+    const core = add(new THREE.SphereGeometry(0.22,16,12),red,0,0.05,0.31);
+    core.scale.set(1,1,0.35);
+    g.scale.setScalar(1.35);
+    g.visible = false;
+  }
+
+  private updateUltron(dt: number) {
+    if (!this.ultronActive || !this.bossAuthority || this.boss.state === "dead") return;
+    const target = this.getBossTarget().position;
+    const desired = new THREE.Vector3(this.boss.pos.x + 4.5, 5.4 + Math.sin(this.time * 2.4) * 0.35, this.boss.pos.z - 2.5);
+    this.ultron.position.lerp(desired, 1 - Math.exp(-2.8 * dt));
+    this.ultron.lookAt(target.x, target.y + 1.2, target.z);
+    this.ultron.rotation.x = Math.sin(this.time * 1.7) * 0.06;
+    this.ultronFire -= dt;
+    if (this.ultronFire <= 0) {
+      this.ultronFire = 3.8;
+      const from = this.ultron.position.clone().add(new THREE.Vector3(0, 0.2, 0));
+      const aim = new THREE.Vector3(target.x, target.y + 1.0, target.z).sub(from).normalize();
+      this.spawnOrb(from, aim, 24, 13);
+      for (let i = 0; i < 5; i++) this.fx.spawn(from.x, from.y, from.z, rnd(-2,2), rnd(-1,2), rnd(-2,2), 0.3, 0.12, new THREE.Color(1.8,0.25,0.35));
+      sfx.shoot();
+    }
+  }
 
   private buildWorld() {
     const scene = this.scene;
@@ -1010,6 +1058,10 @@ touchLook(dx: number, dy: number) {
     b.flash = 0;
     b.last = "";
     b.lunge = 0;
+    this.ultronActive = false;
+    this.ultronFire = 2.5;
+    this.ultron.visible = false;
+    this.ultron.position.set(5, 5, 14);
     this.brig.root.visible = true;
     this.brig.root.rotation.set(0, b.yaw, 0);
     this.bpose = { shR: 0, elR: -0.2, shL: 0, elL: -0.2, lean: 0, crouch: 0, headX: 0, fall: 0 };
@@ -1058,6 +1110,7 @@ touchLook(dx: number, dy: number) {
       if (!this.mark50Cinematic) {
         this.updatePlayer(dt);
         this.updateBoss(dt);
+        this.updateUltron(dt);
         this.updateProjectiles(dt);
         this.updateShocks(dt);
         this.updateMeteors(dt);
@@ -2840,6 +2893,10 @@ private updatePlayerPose(dt: number) {
     }
     if (this.bossAuthority && b.phase === 1 && b.hp <= BOSS_MAX * 0.5) {
       b.phase = 2;
+      this.ultronActive = true;
+      this.ultron.visible = true;
+      this.ultron.position.set(b.pos.x + 5, 5.5, b.pos.z - 2);
+      this.say("ULTRON REINFORCEMENTS DEPLOYED", 3.0);
       b.state = "roar";
       b.t = 0;
       b.did = 0;
@@ -2893,14 +2950,17 @@ private updatePlayerPose(dt: number) {
     if (dist < 9) {
       if (r < 0.45) a = "punch";
       else if (r < 0.72) a = "slam";
-      else if (p2 && r < 0.9) a = "rush";
+      else if (p2 && r < 0.82) a = "rush";
+      else if (p2 && r < 0.92) a = "stoneBurst";
+      else if (p2) a = "singularity";
       else a = "punch";
     } else {
       if (r < 0.28) a = "orbs";
       else if (r < 0.5) a = "slam";
       else if (r < 0.72) a = "beam";
-      else if (p2 && r < 0.88) a = "meteor";
-      else if (p2) a = "rush";
+      else if (p2 && r < 0.78) a = "meteor";
+      else if (p2 && r < 0.88) a = "stoneBurst";
+      else if (p2) a = "singularity";
       else a = "orbs";
     }
     if (a === b.last && Math.random() < 0.7) a = a === "orbs" ? "slam" : "orbs";
@@ -2964,7 +3024,7 @@ private updatePlayerPose(dt: number) {
     // Recovery watchdog: an interrupted animation can never leave the boss frozen forever.
     const stateTimeout: Record<BossState, number> = {
       idle: 999, punch: 2.4, slam: 3.2, orbs: 3.8, meteor: 4.8,
-      rush: 3.2, beam: 3.4, stagger: 2.2, roar: 3.0, dead: 999
+      rush: 3.2, beam: 3.4, stoneBurst: 3.2, singularity: 3.8, stagger: 2.2, roar: 3.0, dead: 999
     };
     if (b.t > stateTimeout[b.state] && b.state !== "idle" && b.state !== "dead") {
       this.endAttack(0.45);
@@ -3203,6 +3263,46 @@ private updatePlayerPose(dt: number) {
         } else {
           this.endAttack(0.8);
         }
+        break;
+      }
+      case "stoneBurst": {
+        // Thanos channels the Power Stone, then releases a fan of tracking energy orbs.
+        bp.shL = -1.65;
+        bp.elL = -0.08;
+        bp.shR = -0.35;
+        bp.lean = -0.18;
+        const g = this.gauntletPos(this.v1);
+        if (b.t < 0.85) {
+          if (Math.random() < 0.55) this.fx.spawn(g.x + rnd(-0.8,0.8), g.y + rnd(-0.8,0.8), g.z + rnd(-0.8,0.8), 0,0,0,0.35,0.24,new THREE.Color(3,0.35,0.2));
+        } else if (b.did === 0) {
+          b.did = 1;
+          for (let i = -2; i <= 2; i++) {
+            const aim = new THREE.Vector3(targetPos.x, targetPos.y + 1, targetPos.z).sub(g);
+            aim.x += i * 0.16;
+            aim.normalize();
+            this.spawnOrb(g, aim, 23, 17);
+          }
+          sfx.shoot();
+        }
+        if (b.t > 2.35) this.endAttack(0.55);
+        break;
+      }
+      case "singularity": {
+        // Reality/Space Stone pulse: a clearly telegraphed expanding shockwave.
+        bp.shR = -2.5;
+        bp.shL = -2.5;
+        bp.elR = -0.2;
+        bp.elL = -0.2;
+        bp.crouch = b.t < 1.0 ? 0.18 : 0.35;
+        bp.lean = -0.22;
+        if (b.t > 0.95 && b.did === 0) {
+          b.did = 1;
+          this.spawnShock(b.pos.x, b.pos.z, 19, 24);
+          this.shake = Math.max(this.shake, 0.65);
+          sfx.boom();
+          this.explode(this.v1.set(b.pos.x, 1.2, b.pos.z), 0.75, new THREE.Color(0.4, 1.0, 3.0));
+        }
+        if (b.t > 2.8) this.endAttack(0.7);
         break;
       }
       case "stagger": {
