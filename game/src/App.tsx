@@ -142,6 +142,36 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [mp, mpUid, hud.status]);
 
+  // One boss simulation per room: the host publishes it; other pilots only render its snapshot.
+  useEffect(() => {
+    const game = gameRef.current;
+    const room = mpRoom;
+    if (!game || !room || !mpUid) return;
+    const isHost = room.hostId === mpUid;
+    game.setBossAuthority(isHost);
+    if (isHost) return;
+    let active = true;
+    let off: (() => void) | undefined;
+    try {
+      off = mp.onBossUpdate((state) => {
+        if (active && state) game.applyBossNetworkState(state);
+      });
+    } catch (e) {
+      setMpError(e instanceof Error ? e.message : String(e));
+    }
+    return () => { active = false; off?.(); };
+  }, [mp, mpRoom?.code, mpRoom?.hostId, mpUid]);
+
+  useEffect(() => {
+    const game = gameRef.current;
+    const room = mpRoom;
+    if (!game || !room || !mpUid || room.hostId !== mpUid || hud.status !== "playing") return;
+    const publish = () => void mp.publishBossState(game.getBossNetworkState()).catch((e) => setMpError(e instanceof Error ? e.message : String(e)));
+    publish();
+    const timer = window.setInterval(publish, 100);
+    return () => window.clearInterval(timer);
+  }, [mp, mpRoom?.code, mpRoom?.hostId, mpUid, hud.status]);
+
   const createRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.create(mpName, mpMode); setMpRoom(r.room); setMpUid(mp.playerId); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
   const joinRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.connect(); const r = await mp.join(mpName, mpCode); setMpRoom(r.room); setMpUid(mp.playerId); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
   const startRoom = async () => { setMpBusy(true); setMpError(""); try { await mp.start(); launchMultiplayerGame(); } catch (e) { setMpError(e instanceof Error ? e.message : String(e)); } finally { setMpBusy(false); } };
