@@ -579,7 +579,7 @@ useEffect(() => {
                 <div>R — ถอดชุด / ใส่ชุด Mark {armorModel}</div>
                 <div>B — กาง / พับปีกนาโน</div>
                 <div>T — ซ่อมเกราะ</div>
-                <div>1–9, 0 — เลือกสกิล</div>
+                <div>1–9, 0, G — เลือกสกิล · MARK 50 มีสกิลเฉพาะ</div>
                 <div>คลิก / แตะโจมตี — ยิงอาวุธที่เลือก</div>
               </div>
               <button type="button" onClick={() => setSettingsOpen(false)}
