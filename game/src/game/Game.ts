@@ -90,7 +90,7 @@ export const WEAPON_INFO: WeaponInfo[] = [
 /* ------------------------------------------------------------------ */
 
 const ARENA_R = 58;
-const BOSS_MAX = 1_000_000;
+const BOSS_MAX = 100_000;
 const PLAYER_MAX = 250;
 const TONY_MAX = 250;
 const TAU = Math.PI * 2;
@@ -2748,6 +2748,8 @@ private updatePlayerPose(dt: number) {
   /* ---------------------------------------------------------------- */
 
   private bossAuthority = true;
+  private remoteBossTarget = new THREE.Vector3(0, 0, 14);
+  private remoteBossYaw = Math.PI;
   private networkBossDamageSender: ((amount: number, point: { x: number; y: number; z: number }) => void) | null = null;
   private combatEventSender: ((event: CombatNetworkEvent) => void) | null = null;
   private receivingCombatEvent = false;
@@ -2784,15 +2786,20 @@ private updatePlayerPose(dt: number) {
   }
   getBossNetworkState(): BossNetworkState {
     const b = this.boss;
-    return { x:b.pos.x,y:b.pos.y,z:b.pos.z,yaw:b.yaw,hp:b.hp,phase:b.phase,state:b.state,t:b.t,walk:b.walk,flash:b.flash,think:b.think,did:b.did,updatedAt:Date.now() };
+    return { x:b.pos.x,y:b.pos.y,z:b.pos.z,yaw:b.yaw,hp:b.hp,phase:b.phase,state:b.state,t:b.t,walk:b.walk,flash:b.flash,think:b.think,did:b.did,shR:this.bpose.shR,elR:this.bpose.elR,shL:this.bpose.shL,elL:this.bpose.elL,lean:this.bpose.lean,crouch:this.bpose.crouch,headX:this.bpose.headX,fall:this.bpose.fall,updatedAt:Date.now() };
   }
   applyBossNetworkState(s: BossNetworkState) {
     if (this.bossAuthority) return;
     const b = this.boss;
-    b.pos.set(s.x,s.y,s.z); b.yaw=s.yaw; b.hp=s.hp; b.phase=s.phase;
+    this.remoteBossTarget.set(s.x,s.y,s.z);
+    this.remoteBossYaw = s.yaw;
+    b.hp=s.hp; b.phase=s.phase;
     b.state=s.state as typeof b.state; b.t=s.t; b.walk=s.walk; b.flash=s.flash;
     b.think=s.think; b.did=s.did;
-    this.updateBossPose(0.05);
+    this.bpose.shR=s.shR ?? 0; this.bpose.elR=s.elR ?? -0.2;
+    this.bpose.shL=s.shL ?? 0; this.bpose.elL=s.elL ?? -0.2;
+    this.bpose.lean=s.lean ?? 0; this.bpose.crouch=s.crouch ?? 0;
+    this.bpose.headX=s.headX ?? 0; this.bpose.fall=s.fall ?? 0;
     this.emitHud(false);
   }
 
@@ -2860,8 +2867,8 @@ private updatePlayerPose(dt: number) {
 
   private turnBoss(dt: number, rate: number) {
     const b = this.boss;
-    const p = this.pl;
-    const want = Math.atan2(p.pos.x - b.pos.x, p.pos.z - b.pos.z);
+    const target = this.getBossTarget().position;
+    const want = Math.atan2(target.x - b.pos.x, target.z - b.pos.z);
     const d = angDiff(b.yaw, want);
     b.yaw += clamp(d, -rate * dt, rate * dt);
   }
@@ -3002,15 +3009,22 @@ private updatePlayerPose(dt: number) {
           bp.elR = -0.3;
           bp.elL = -0.3;
           bp.crouch = 0.35 * Math.min(1, b.t / 0.5);
-          b.from.copy(b.pos);
-          const target = this.v1.set(targetPos.x, 0, targetPos.z);
-          const dv = this.v2.copy(target).sub(b.pos);
-          const l = dv.length();
-          if (l > 28) dv.multiplyScalar(28 / l);
-          b.to.copy(b.pos).add(dv);
-          // stop short so we don't land inside the player
-          const dl = dv.length();
-          if (dl > 3) b.to.addScaledVector(dv.normalize(), -2.5);
+          // Lock the take-off and landing points once at the start of the leap.
+          // Recalculating these every frame makes Thanos drift/teleport mid-air.
+          if (b.t <= 0.08) {
+            b.from.copy(b.pos);
+            b.from.y = 0;
+            const target = this.v1.set(targetPos.x, 0, targetPos.z);
+            const dv = this.v2.copy(target).sub(b.from);
+            const l = dv.length();
+            if (l > 28) dv.multiplyScalar(28 / l);
+            b.to.copy(b.from).add(dv);
+            const dl = dv.length();
+            if (dl > 3) b.to.addScaledVector(dv.normalize(), -2.5);
+            const rr = Math.hypot(b.to.x, b.to.z);
+            if (rr > ARENA_R - 4) b.to.multiplyScalar((ARENA_R - 4) / rr);
+            b.to.y = 0;
+          }
         } else if (b.t < 1.6) {
           const u = (b.t - 0.7) / 0.9;
           b.pos.lerpVectors(b.from, b.to, u);
@@ -3251,6 +3265,10 @@ private updatePlayerPose(dt: number) {
     const r = this.brig;
     const bp = this.bpose;
     const ps = this.pose;
+    if (!this.bossAuthority) {
+      b.pos.lerp(this.remoteBossTarget, 1 - Math.exp(-14 * dt));
+      b.yaw += angDiff(b.yaw, this.remoteBossYaw) * (1 - Math.exp(-14 * dt));
+    }
     r.root.position.copy(b.pos);
     r.root.rotation.y = b.yaw;
     ps.shR = damp(ps.shR, bp.shR, 9, dt);
